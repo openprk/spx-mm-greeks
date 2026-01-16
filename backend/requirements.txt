@@ -1,0 +1,10 @@
+﻿fastapi
+uvicorn[standard]
+httpx
+pydantic
+pydantic-settings
+numpy
+scipy
+python-dotenv
+cachetools
+pytest

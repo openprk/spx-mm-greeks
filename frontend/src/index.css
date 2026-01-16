@@ -1,0 +1,108 @@
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+@layer base {
+  html {
+    @apply h-full;
+  }
+
+  body {
+    @apply h-full bg-gray-50 text-gray-900;
+  }
+
+  #root {
+    @apply h-full;
+  }
+}
+
+@layer components {
+  .btn {
+    @apply px-4 py-2 bg-blue-600 text-white rounded-md hover:bg-blue-700 focus:outline-none focus:ring-2 focus:ring-blue-500 focus:ring-offset-2 transition-colors;
+  }
+
+  .btn-secondary {
+    @apply px-4 py-2 bg-gray-200 text-gray-900 rounded-md hover:bg-gray-300 focus:outline-none focus:ring-2 focus:ring-gray-500 focus:ring-offset-2 transition-colors;
+  }
+
+  .card {
+    @apply bg-white rounded-lg shadow-md p-6;
+    min-height: fit-content;
+    height: auto;
+    position: relative;
+  }
+
+  .input {
+    @apply px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent;
+  }
+
+  .select {
+    @apply px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent bg-white;
+  }
+}
+
+/* Layout fixes */
+main {
+  min-height: calc(100vh - 200px); /* Ensure main has adequate height */
+}
+
+/* Ensure sidebar components don't overflow */
+.space-y-6 > * {
+  overflow-x: auto;
+}
+
+/* Table responsiveness */
+.table-container {
+  overflow-x: auto;
+  -webkit-overflow-scrolling: touch;
+}
+
+/* Heatmap container - clean and simple */
+.heatmap-container {
+  min-height: 500px;
+  position: relative;
+  overflow: visible;
+}
+
+/* Plotly styling - clean and minimal */
+.js-plotly-plot {
+  position: relative !important;
+  overflow: visible !important;
+  width: 100% !important;
+  height: 500px !important;
+  margin: 0 auto !important;
+}
+
+.js-plotly-plot .plotly-notifier {
+  display: none !important;
+}
+
+/* Allow tooltips to display properly */
+.js-plotly-plot .hoverlayer {
+  position: absolute !important;
+  z-index: 1000 !important;
+  pointer-events: none !important;
+  overflow: visible !important;
+  /* Remove restrictive max-width/height */
+}
+
+.js-plotly-plot .hoverlayer .hovertext {
+  background: rgba(0, 0, 0, 0.9) !important;
+  color: white !important;
+  border-radius: 6px !important;
+  padding: 10px !important;
+  font-size: 12px !important;
+  white-space: pre-line !important;
+  pointer-events: none !important;
+  position: absolute !important;
+  box-shadow: 0 2px 8px rgba(0, 0, 0, 0.15) !important;
+  /* Remove restrictive max-width */
+}
+
+/* Clean up any unwanted interactive elements that might interfere */
+.js-plotly-plot .modebar {
+  position: absolute !important;
+  top: 0 !important;
+  right: 0 !important;
+  z-index: 1001 !important;
+}

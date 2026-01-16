@@ -1,4 +1,4 @@
-from typing import Dict, List, Tuple
+from typing import Dict, List, Tuple, Optional
 import numpy as np
 from backend.models import Regime, AggregateData
 from backend.exposures import calculate_neutral_threshold, classify_regime

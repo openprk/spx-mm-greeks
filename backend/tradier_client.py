@@ -35,7 +35,7 @@ class TradierClient:
     async def get_spx_expirations(self) -> list:
         """Get available SPX options expiration dates"""
         url = f"{self.base_url}/markets/options/expirations"
-        params = {"symbol": "SPX", "includeAllRoots": "false", "strikes": "false"}
+        params = {"symbol": "SPX", "includeAllRoots": "true", "strikes": "false"}
 
         async with httpx.AsyncClient(timeout=30.0) as client:
             response = await client.get(url, headers=self.headers, params=params)

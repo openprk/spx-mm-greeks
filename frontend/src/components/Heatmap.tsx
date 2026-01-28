@@ -106,7 +106,7 @@ const Heatmap: React.FC<HeatmapProps> = ({
         let patterns: string[] = [];
         let regime = '';
 
-        matrixData.x_expirations.forEach((expiration, expIndex) => {
+        matrixData.x_expirations.forEach((_, expIndex) => {
           const exposure = matrixData.z[strikeIndex]?.[expIndex] || 0;
           if (exposure !== 0) {
             totalExposure += exposure;
@@ -226,13 +226,6 @@ const Heatmap: React.FC<HeatmapProps> = ({
         CEX: '#ef4444'   // Red
       };
 
-      const greekNames = {
-        GEX: 'Gamma Exposure (GEX)',
-        DEX: 'Delta Exposure (DEX)',
-        VEX: 'Vanna Exposure (VEX)',
-        CEX: 'Charm Exposure (CEX)'
-      };
-
       ['GEX', 'DEX', 'VEX', 'CEX'].forEach(greek => {
         const values = exposuresData.strikes.map(s => {
           switch (greek) {
@@ -336,7 +329,7 @@ const Heatmap: React.FC<HeatmapProps> = ({
         ...baseLayout,
         title: {
           text: `SPX Market Maker ${metric} Exposure`,
-          font: { size: 18, color: '#1f2937', weight: 'bold' },
+          font: { size: 18, color: '#1f2937' },
           x: 0.5,
           y: 0.95,
           xanchor: 'center' as const,
@@ -347,10 +340,10 @@ const Heatmap: React.FC<HeatmapProps> = ({
           showarrow: false,
           x: 0.5,
           y: 0.89,
-          xref: 'paper',
-          yref: 'paper',
-          xanchor: 'center',
-          yanchor: 'top',
+          xref: 'paper' as const,
+          yref: 'paper' as const,
+          xanchor: 'center' as const,
+          yanchor: 'top' as const,
           font: { size: 12, color: '#6b7280' }
         }],
         margin: { t: 100, r: 80, b: 60, l: 100 },
@@ -383,8 +376,7 @@ const Heatmap: React.FC<HeatmapProps> = ({
           linewidth: 1,
           tickfont: { size: 10 },
           tickformat: ',.0f',
-          mirror: false,
-          autorange: 'reversed' // Higher strikes at top, lower at bottom
+          mirror: false
         }
       };
     } else {
@@ -392,7 +384,7 @@ const Heatmap: React.FC<HeatmapProps> = ({
         ...baseLayout,
         title: {
           text: `SPX Market Maker Greek Exposures - ${expiration}`,
-          font: { size: 16, color: '#1f2937', weight: 'bold' },
+          font: { size: 16, color: '#1f2937' },
           x: 0.5,
           y: 0.95,
           xanchor: 'center' as const,

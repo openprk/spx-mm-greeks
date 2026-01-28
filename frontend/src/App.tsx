@@ -1,11 +1,13 @@
-import { useState, useEffect, useRef } from 'react';
-import Heatmap from './components/Heatmap';
+import { useState, useEffect, useRef, Suspense, lazy } from 'react';
 import Controls from './components/Controls';
 import Legend from './components/Legend';
 import ConductivityCard from './components/ConductivityCard';
 import TerrainTable from './components/TerrainTable';
 import { useApiPolling } from './hooks/useApiPolling';
 import type { ExposuresResponse, ExposuresMatrixResponse, ExpirationsResponse } from './types/api';
+
+// Lazy load heavy components
+const Heatmap = lazy(() => import('./components/Heatmap'));
 
 function App() {
   // Control states
@@ -192,13 +194,22 @@ function App() {
           {/* Heatmap - takes up most space */}
           <div className="flex-1 xl:flex-[3]">
             <div className="card h-auto">
-              <Heatmap
-                matrixData={matrixData}
-                exposuresData={exposuresData}
-                metric={metric}
-                expiration={expiration}
-                loading={loading}
-              />
+              <Suspense fallback={
+                <div className="flex items-center justify-center h-96">
+                  <div className="text-center">
+                    <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-blue-600 mx-auto mb-4"></div>
+                    <div className="text-gray-600">Loading chart...</div>
+                  </div>
+                </div>
+              }>
+                <Heatmap
+                  matrixData={matrixData}
+                  exposuresData={exposuresData}
+                  metric={metric}
+                  expiration={expiration}
+                  loading={loading}
+                />
+              </Suspense>
             </div>
           </div>
 

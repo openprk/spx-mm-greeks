@@ -1,4 +1,4 @@
-﻿import { defineConfig } from 'vite'
+import { defineConfig } from 'vite'
 import react from '@vitejs/plugin-react'
 import { NodeGlobalsPolyfillPlugin } from '@esbuild-plugins/node-globals-polyfill'
 import { NodeModulesPolyfillPlugin } from '@esbuild-plugins/node-modules-polyfill'
@@ -9,6 +9,19 @@ export default defineConfig({
   server: {
     port: 5173,
     host: true
+  },
+  build: {
+    rollupOptions: {
+      output: {
+        manualChunks: {
+          // Separate Plotly.js into its own chunk (very large library)
+          plotly: ['plotly.js'],
+          'react-plotly': ['react-plotly.js']
+        }
+      }
+    },
+    // Increase chunk size warning limit since we're intentionally chunking
+    chunkSizeWarningLimit: 1000
   },
   define: {
     'process.env': {},

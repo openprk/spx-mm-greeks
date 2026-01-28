@@ -54,13 +54,9 @@ const TerrainTable: React.FC<TerrainTableProps> = ({
   }, [exposuresData]);
 
   const formatExposure = (value: number) => {
-    // Format large numbers with K/M suffixes
-    if (Math.abs(value) >= 1000000) {
-      return `${(value / 1000000).toFixed(1)}M`;
-    } else if (Math.abs(value) >= 1000) {
-      return `${(value / 1000).toFixed(1)}K`;
-    }
-    return value.toFixed(0);
+    // Format as millions with K = thousands of millions = billions (UW style)
+    const millions = value / 1000000;
+    return `${millions.toFixed(1)}K`;
   };
 
   const getRegimeColor = (sign: string) => {

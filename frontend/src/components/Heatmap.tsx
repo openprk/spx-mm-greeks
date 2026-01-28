@@ -81,82 +81,138 @@ const Heatmap: React.FC<HeatmapProps> = ({
     }
 
     if (expiration === 'ALL' && matrixData) {
-      // Simplified customdata for rich hover information
-      const customdata = matrixData.y_strikes.map(strike => {
+      // Aggregate exposure by strike across all expirations for UW-style chart
+      const strikeExposureMap = new Map<number, {
+        exposure: number;
+        regime: string;
+        gex: number;
+        dex: number;
+        vex: number;
+        cex: number;
+        call_oi: number;
+        put_oi: number;
+        patterns: string[];
+      }>();
+
+      // Aggregate data across all expirations for each strike
+      matrixData.y_strikes.forEach((strike, strikeIndex) => {
+        let totalExposure = 0;
+        let totalGex = 0;
+        let totalDex = 0;
+        let totalVex = 0;
+        let totalCex = 0;
+        let totalCallOi = 0;
+        let totalPutOi = 0;
+        let patterns: string[] = [];
+        let regime = '';
+
+        matrixData.x_expirations.forEach((expiration, expIndex) => {
+          const exposure = matrixData.z[strikeIndex]?.[expIndex] || 0;
+          if (exposure !== 0) {
+            totalExposure += exposure;
+          }
+        });
+
+        // Get strike details for hover info
         const strikeKey = strike.toString();
         const details = matrixData.strike_details?.[strikeKey];
+        if (details) {
+          totalGex = details.gex;
+          totalDex = details.dex;
+          totalVex = details.vex;
+          totalCex = details.cex;
+          totalCallOi = details.call_oi;
+          totalPutOi = details.put_oi;
+          regime = details.regime_code;
+          patterns = details.pattern_flags;
+        }
 
-        return details ? [
-          details.regime_code,
-          details.classification,
-          details.gex,
-          details.dex,
-          details.vex,
-          details.cex,
-          details.call_oi,
-          details.put_oi,
-          details.pattern_flags.length > 0 ? details.pattern_flags.join(', ') : ''
-        ] : ['', '', 0, 0, 0, 0, 0, 0, ''];
+        strikeExposureMap.set(strike, {
+          exposure: totalExposure,
+          regime,
+          gex: totalGex,
+          dex: totalDex,
+          vex: totalVex,
+          cex: totalCex,
+          call_oi: totalCallOi,
+          put_oi: totalPutOi,
+          patterns
+        });
       });
 
-      // Enhanced heatmap for ALL expirations with rich tooltips
-      const heatmapTrace = {
-        z: matrixData.z,
-        x: matrixData.x_expirations,
-        y: matrixData.y_strikes,
-        type: 'heatmap' as const,
-        colorscale: [
-          [0, '#1e3a8a'],    // Deep blue for very negative
-          [0.2, '#3b82f6'],  // Blue for negative
-          [0.4, '#93c5fd'],  // Light blue for low negative
-          [0.5, '#f3f4f6'],  // Gray for neutral
-          [0.6, '#fed7aa'],  // Light orange for low positive
-          [0.8, '#f59e0b'],  // Orange for positive
-          [1, '#dc2626']     // Red for very positive
-        ] as [number, string][],
-        zmid: 0,
-        hoverongaps: false,
-        customdata: customdata,
-        xgap: 1,
-        ygap: 1,
-        hovertemplate:
-          `<b>%{x} | Strike %{y}</b><br>` +
-          `<b>${metric}:</b> %{z:.2s}<br>` +
-          `<b>Regime:</b> %{customdata[0]}<br>` +
-          `<b>Classification:</b> %{customdata[1]}<br>` +
-          `<b>GEX:</b> %{customdata[2]:.2s} | <b>DEX:</b> %{customdata[3]:.2s}<br>` +
-          `<b>VEX:</b> %{customdata[4]:.2s} | <b>CEX:</b> %{customdata[5]:.2s}<br>` +
-          `<b>OI:</b> %{customdata[6]} Calls | %{customdata[7]} Puts` +
-          `%{customdata[8]:+%<br><b>⚠️ Patterns:</b> %{customdata[8]}%}` +
-          `<extra></extra>`,
-        showscale: true,
-        colorbar: {
-          title: {
-            text: metric,
-            side: 'right'
+      // Create horizontal bar chart data (strikes vertical on Y, exposure horizontal on X)
+      // Display values in millions (÷1e6) with K = thousands of millions = billions
+      const barData = Array.from(strikeExposureMap.entries())
+        .filter(([_, data]) => Math.abs(data.exposure) > 0.01) // Filter out near-zero exposures
+        .sort((a, b) => a[0] - b[0]) // Sort by strike price
+        .map(([strike, data]) => ({
+          x: [data.exposure / 1e6], // Divide by 1e6 to show in millions (UW standard)
+          y: [strike],        // Strike price on Y-axis (vertical)
+          type: 'bar' as const,
+          orientation: 'h' as const, // Horizontal bars
+          name: `Strike ${strike}`,
+          marker: {
+            color: data.exposure >= 0 ? '#dc2626' : '#2563eb', // Red for positive, blue for negative
+            line: {
+              width: 0
+            }
           },
-          titleside: 'right',
-          thickness: 20,
-          len: 0.8
-        }
-      };
+          customdata: [[
+            data.regime,
+            data.gex / 1e6,  // Display individual Greeks in millions (UW standard)
+            data.dex / 1e6,
+            data.vex / 1e6,
+            data.cex / 1e6,
+            data.call_oi,
+            data.put_oi,
+            data.patterns.length > 0 ? data.patterns.join(', ') : ''
+          ]],
+          hovertemplate:
+            `<b>Strike %{y:,.0f}</b><br>` +
+            `<b>${metric}:</b> %{x:.1f}K<br>` +
+            `<b>Regime:</b> %{customdata[0]}<br>` +
+            `<b>GEX:</b> %{customdata[1]:.1f}K | <b>DEX:</b> %{customdata[2]:.1f}K<br>` +
+            `<b>VEX:</b> %{customdata[3]:.1f}K | <b>CEX:</b> %{customdata[4]:.1f}K<br>` +
+            `<b>OI:</b> %{customdata[5]}/%{customdata[6]}` +
+            `%{customdata[7]:+%<br><b>⚠️ %{customdata[7]}</b>%}` +
+            `<extra></extra>`
+        }));
 
-      // SPX spot reference line
-      const spotLineTrace = {
-        x: matrixData.x_expirations,
-        y: new Array(matrixData.x_expirations.length).fill(spot),
+      // Add vertical line at zero exposure (center line for horizontal bars)
+      const zeroLine = {
+        x: [0, 0],
+        y: [Math.min(...Array.from(strikeExposureMap.keys())), Math.max(...Array.from(strikeExposureMap.keys()))],
         mode: 'lines' as const,
         line: {
-          color: '#fbbf24',
-          width: 3,
-          dash: 'dash'
+          color: '#6b7280',
+          width: 2,
+          dash: 'solid'
         },
-        name: `SPX Spot: ${spot.toFixed(2)}`,
+        showlegend: false,
+        hovertemplate: 'Zero Exposure<extra></extra>'
+      };
+
+      // Add SPX spot horizontal reference line (prominent middle line)
+      const allExposures = Array.from(strikeExposureMap.values()).map(d => d.exposure);
+      const minExposure = Math.min(...allExposures);
+      const maxExposure = Math.max(...allExposures);
+      const exposureRange = maxExposure - minExposure;
+
+      const spotLine = {
+        x: [minExposure - exposureRange * 0.2, maxExposure + exposureRange * 0.2],
+        y: [spot, spot],
+        mode: 'lines' as const,
+        line: {
+          color: '#f59e0b',
+          width: 3,
+          dash: 'solid'
+        },
+        name: `SPX Spot: ${spot.toFixed(0)}`,
         hovertemplate: `SPX Spot: ${spot.toFixed(2)}<extra></extra>`,
         showlegend: true
       };
 
-      traces.push(heatmapTrace, spotLineTrace);
+      traces.push(...barData, zeroLine, spotLine);
 
     } else if (exposuresData) {
       // Multi-line chart for single expiration showing all Greeks
@@ -194,10 +250,10 @@ const Heatmap: React.FC<HeatmapProps> = ({
           return strikeData ? [
             strikeData.regime_code,
             strikeData.classification,
-            strikeData.gex,
-            strikeData.dex,
-            strikeData.vex,
-            strikeData.cex,
+            strikeData.gex / 1e6,  // Display in millions (UW standard)
+            strikeData.dex / 1e6,
+            strikeData.vex / 1e6,
+            strikeData.cex / 1e6,
             strikeData.call_oi,
             strikeData.put_oi,
             strikeData.pattern_flags.length > 0 ? strikeData.pattern_flags.join(', ') : ''
@@ -213,13 +269,12 @@ const Heatmap: React.FC<HeatmapProps> = ({
           customdata: customdata,
           hovertemplate:
             `<b>Strike %{x}</b><br>` +
-            `<b>${greekNames[greek as keyof typeof greekNames]}:</b> %{y:.2s}<br>` +
+            `<b>${greek}:</b> %{y:.1f}K<br>` +
             `<b>Regime:</b> %{customdata[0]}<br>` +
-            `<b>Classification:</b> %{customdata[1]}<br>` +
-            `<b>GEX:</b> %{customdata[2]:.2s} | <b>DEX:</b> %{customdata[3]:.2s}<br>` +
-            `<b>VEX:</b> %{customdata[4]:.2s} | <b>CEX:</b> %{customdata[5]:.2s}<br>` +
-            `<b>OI:</b> %{customdata[6]} Calls | %{customdata[7]} Puts` +
-            `%{customdata[8]:+%<br><b>⚠️ Patterns:</b> %{customdata[8]}%}` +
+            `<b>GEX:</b> %{customdata[2]:.1f}K | <b>DEX:</b> %{customdata[3]:.1f}K<br>` +
+            `<b>VEX:</b> %{customdata[4]:.1f}K | <b>CEX:</b> %{customdata[5]:.1f}K<br>` +
+            `<b>OI:</b> %{customdata[6]}/%{customdata[7]}` +
+            `%{customdata[8]:+%<br><b>⚠️ %{customdata[8]}</b>%}` +
             `<extra></extra>`,
           line: {
             color: greekColors[greek as keyof typeof greekColors],
@@ -280,42 +335,64 @@ const Heatmap: React.FC<HeatmapProps> = ({
       return {
         ...baseLayout,
         title: {
-          text: `SPX ${metric} Exposures - All Expirations`,
-          font: { size: 18, color: '#1f2937' },
+          text: `SPX Market Maker ${metric} Exposure`,
+          font: { size: 18, color: '#1f2937', weight: 'bold' },
           x: 0.5,
           y: 0.95,
           xanchor: 'center' as const,
           yanchor: 'top' as const
         },
+        annotations: [{
+          text: `Per 1% move • Aggregated across all expirations`,
+          showarrow: false,
+          x: 0.5,
+          y: 0.89,
+          xref: 'paper',
+          yref: 'paper',
+          xanchor: 'center',
+          yanchor: 'top',
+          font: { size: 12, color: '#6b7280' }
+        }],
+        margin: { t: 100, r: 80, b: 60, l: 100 },
+        bargap: 0.1, // Gap between bars
         xaxis: {
           title: {
-            text: 'Expiration Date',
-            font: { size: 14, color: '#6b7280' }
-          },
-          type: 'category' as const,
-          showgrid: true,
-          gridcolor: '#f3f4f6',
-          linecolor: '#e5e7eb',
-          tickfont: { size: 11 }
-        },
-        yaxis: {
-          title: {
-            text: 'Strike Price',
-            font: { size: 14, color: '#6b7280' }
+            text: `${metric} (K)`,
+            font: { size: 13, color: '#6b7280' }
           },
           type: 'linear' as const,
           showgrid: true,
           gridcolor: '#f3f4f6',
-          linecolor: '#e5e7eb',
-          tickfont: { size: 11 }
+          showline: true,
+          linecolor: '#d1d5db',
+          linewidth: 1,
+          tickfont: { size: 10 },
+          tickformat: ',.0f',
+          mirror: false,
+          zeroline: false
+        },
+        yaxis: {
+          title: {
+            text: 'Strike',
+            font: { size: 13, color: '#6b7280' }
+          },
+          type: 'linear' as const,
+          showgrid: false,
+          showline: true,
+          linecolor: '#d1d5db',
+          linewidth: 1,
+          tickfont: { size: 10 },
+          tickformat: ',.0f',
+          mirror: false,
+          autorange: 'reversed' // Higher strikes at top, lower at bottom
         }
       };
     } else {
       return {
         ...baseLayout,
         title: {
-          text: `SPX Greek Exposures - ${expiration}`,
-          font: { size: 18, color: '#1f2937' },
+          text: `SPX Market Maker Greek Exposures - ${expiration}`,
+          font: { size: 16, color: '#1f2937', weight: 'bold' },
           x: 0.5,
           y: 0.95,
           xanchor: 'center' as const,
@@ -444,9 +521,12 @@ const Heatmap: React.FC<HeatmapProps> = ({
               displayModeBar: true,
               displaylogo: false,
               editable: false,
-              modeBarButtonsToRemove: [],  // ENABLE all zoom/pan buttons
+              modeBarButtonsToRemove: ['lasso2d', 'select2d'],  // Keep pan2d for drag functionality
+              modeBarButtonsToAdd: ['drawline', 'drawopenpath', 'pan2d'],  // Add drag-to-pan
               responsive: true,             // Enable responsive behavior
-              doubleClick: 'reset' as const
+              doubleClick: 'reset' as const,
+              scrollZoom: true,             // Enable scroll to zoom
+              dragmode: 'pan'              // Enable drag-to-pan by default
             }}
             transition={{
               duration: 500,

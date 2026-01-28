@@ -111,10 +111,11 @@ def calculate_contract_exposures(
         except (OverflowError, ValueError, TypeError):
             return 0.0
 
-    gex = calculate_safe_exposure(greeks.gamma, (spot_price ** 2) * 100)
-    dex = calculate_safe_exposure(greeks.delta, spot_price * 100)
-    vex = calculate_safe_exposure(greeks.vanna, spot_price * 100)
-    cex = calculate_safe_exposure(greeks.charm, spot_price * 100)
+    # Apply 1% move normalization (0.01 factor) to match industry standards
+    gex = calculate_safe_exposure(greeks.gamma, (spot_price ** 2) * 0.01 * 100)
+    dex = calculate_safe_exposure(greeks.delta, spot_price * 0.01 * 100)
+    vex = calculate_safe_exposure(greeks.vanna, spot_price * 0.01 * 100)
+    cex = calculate_safe_exposure(greeks.charm, spot_price * 0.01 * 100)
 
     exposures = Exposures(
         gex=gex,

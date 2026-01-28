@@ -114,10 +114,10 @@ const Legend: React.FC = () => {
             <strong>Understanding the numbers:</strong>
           </p>
           <div className="space-y-1">
-            <div><strong>GEX:</strong> Trillions (T) - Gamma exposure magnitude</div>
-            <div><strong>DEX:</strong> Billions (B) - Delta exposure magnitude</div>
-            <div><strong>VEX:</strong> Billions (B) - Vanna exposure magnitude</div>
-            <div><strong>CEX:</strong> Billions (B) - Charm exposure magnitude</div>
+            <div><strong>GEX:</strong> Billions (K = thousands of $M) - Gamma exposure per 1% move</div>
+            <div><strong>DEX:</strong> Billions (K = thousands of $M) - Delta exposure per 1% move</div>
+            <div><strong>VEX:</strong> Billions (K = thousands of $M) - Vanna exposure per 1% move</div>
+            <div><strong>CEX:</strong> Billions (K = thousands of $M) - Charm exposure per 1% move</div>
           </div>
           <p className="mt-2 text-gray-600">
             Negative values indicate market makers are positioned against that direction.

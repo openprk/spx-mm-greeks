@@ -90,37 +90,37 @@ const ConductivityCard: React.FC<ConductivityCardProps> = ({
           <div className="flex justify-between">
             <span>GEX:</span>
             <span className={`font-semibold ${
-              aggregate.regime.g === '+' ? 'text-green-600' :
-              aggregate.regime.g === '-' ? 'text-red-600' : 'text-gray-500'
+              aggregate.gex > 0 ? 'text-green-600' :
+              aggregate.gex < 0 ? 'text-red-600' : 'text-gray-500'
             }`}>
-              {aggregate.regime.g} ({(aggregate.gex / 1e12).toFixed(1)}T)
+              {(aggregate.gex / 1e6).toFixed(1)}K
             </span>
           </div>
           <div className="flex justify-between">
             <span>DEX:</span>
             <span className={`font-semibold ${
-              aggregate.regime.d === '+' ? 'text-green-600' :
-              aggregate.regime.d === '-' ? 'text-red-600' : 'text-gray-500'
+              aggregate.dex > 0 ? 'text-green-600' :
+              aggregate.dex < 0 ? 'text-red-600' : 'text-gray-500'
             }`}>
-              {aggregate.regime.d} ({(aggregate.dex / 1e9).toFixed(0)}B)
+              {(aggregate.dex / 1e6).toFixed(1)}K
             </span>
           </div>
           <div className="flex justify-between">
             <span>VEX:</span>
             <span className={`font-semibold ${
-              aggregate.regime.v === '+' ? 'text-green-600' :
-              aggregate.regime.v === '-' ? 'text-red-600' : 'text-gray-500'
+              aggregate.vex > 0 ? 'text-green-600' :
+              aggregate.vex < 0 ? 'text-red-600' : 'text-gray-500'
             }`}>
-              {aggregate.regime.v} ({(aggregate.vex / 1e9).toFixed(0)}B)
+              {(aggregate.vex / 1e6).toFixed(1)}K
             </span>
           </div>
           <div className="flex justify-between">
             <span>CEX:</span>
             <span className={`font-semibold ${
-              aggregate.regime.c === '+' ? 'text-green-600' :
-              aggregate.regime.c === '-' ? 'text-red-600' : 'text-gray-500'
+              aggregate.cex > 0 ? 'text-green-600' :
+              aggregate.cex < 0 ? 'text-red-600' : 'text-gray-500'
             }`}>
-              {aggregate.regime.c} ({(aggregate.cex / 1e9).toFixed(0)}B)
+              {(aggregate.cex / 1e6).toFixed(1)}K
             </span>
           </div>
         </div>

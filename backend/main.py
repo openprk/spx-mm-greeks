@@ -396,9 +396,17 @@ async def get_exposures(
     try:
         # Use single-flight pattern to prevent concurrent recomputations
         async with exposures_lock:
-            # Get spot price with data integrity checks
-            spot_response = await get_spot()
-            spot_price = spot_response.last
+            # Get spot price with fallback handling (Roberto requirement: SPX is single source of truth)
+            try:
+                spot_response = await get_spot()
+                spot_price = spot_response.last
+            except Exception as e:
+                print(f"❌ SPX spot completely unavailable: {e}")
+                # Only fall back when SPX is completely unavailable, not just stale
+                raise HTTPException(
+                    status_code=503,
+                    detail="SPX spot pricing unavailable. Cannot perform exposure calculations without reliable SPX pricing."
+                )
 
             # DATA INTEGRITY CHECK: Compare SPX vs SPXW quotes for consistency
             try:
@@ -407,29 +415,33 @@ async def get_exposures(
                 price_delta = abs(spot_price - spxw_price)
 
                 print(f"🔍 Spot price integrity: SPX={spot_price:.2f}, SPXW={spxw_price:.2f}, delta={price_delta:.2f}")
+                print(f"🏷️ SPX is SINGLE SOURCE OF TRUTH for ALL exposure calculations (Roberto requirement)")
 
-                # Flag if delta > 2 points (significant discrepancy)
+                # Flag significant discrepancies and consider fallback for data quality
                 if price_delta > 2.0:
-                    print(f"⚠️ LARGE SPX-SPXW DELTA ({price_delta:.2f} points) - potential data inconsistency")
+                    print(f"⚠️ LARGE SPX-SPXW DELTA ({price_delta:.2f} points) - potential SPX data quality issue")
+                    # If delta is very large, SPX data might be problematic - consider mid price fallback
+                    if spot_response.bid > 0 and spot_response.ask > 0:
+                        mid_price = (spot_response.bid + spot_response.ask) / 2
+                        print(f"🔄 Large delta detected, falling back to mid price: {mid_price:.2f} (was {spot_price:.2f})")
+                        spot_price = mid_price
 
-                # Flag if SPX trade_date indicates stale/derived data
+                # SPX is SINGLE SOURCE OF TRUTH - use more reliable SPX source when data seems stale
                 if spot_response.trade_date == 0:
-                    print(f"⚠️ SPX TRADE_DATE = 0 - data may be stale/derived, not real-time")
-                    # Fallback to SPXW if available and delta is reasonable
-                    if price_delta <= 2.0:
-                        print(f"🔄 FALLBACK: Using SPXW price ({spxw_price:.2f}) due to stale SPX data")
-                        spot_price = spxw_price
-                        spot_response = SpotResponse(**spxw_response)
+                    if spot_response.bid > 0 and spot_response.ask > 0:
+                        mid_price = (spot_response.bid + spot_response.ask) / 2
+                        print(f"🔄 SPX TRADE_DATE = 0, falling back to mid price: {mid_price:.2f} (was {spot_price:.2f})")
+                        spot_price = mid_price
                     else:
-                        print(f"⚠️ NOT FALLING BACK: SPXW delta too large ({price_delta:.2f})")
+                        print(f"⚠️ SPX TRADE_DATE = 0 but no bid/ask available, continuing with last price")
+                    print(f"🔍 SPX-SPXW delta: {price_delta:.2f} points (SPXW never used for calculations)")
 
             except Exception as e:
-                print(f"⚠️ SPX-SPXW integrity check failed: {e} - continuing with SPX data")
+                print(f"⚠️ SPX-SPXW integrity check failed: {e} - continuing with SPX data (SPX is single source of truth)")
 
-            # GUARDRAIL: Ensure we're using SPX-derived pricing for consistency
-            if mode == "0DTE":
-                assert spot_response.symbol == "SPX", f"0DTE mode must use SPX spot for calculations, got {spot_response.symbol}"
-                print(f"✅ 0DTE guardrail passed: Using {spot_response.symbol} spot ({spot_price}) for calculations")
+            # GUARDRAIL: SPX must ALWAYS be the single source of truth for spot pricing (Roberto requirement)
+            assert spot_response.symbol == "SPX", f"MUST use SPX spot for ALL calculations (single source of truth), got {spot_response.symbol}"
+            print(f"✅ SPX guardrail passed: Using {spot_response.symbol} spot ({spot_price}) for ALL calculations (mode: {mode})")
 
             # Get data based on expiration
             if expiration == "ALL":

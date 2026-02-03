@@ -3,6 +3,7 @@ import type { ExposuresResponse, ExposuresMatrixResponse, MetricType, VixRegimeT
 
 interface UseApiPollingOptions {
   refreshInterval: number;
+  mode?: string;
   onData: (data: {
     exposuresData: ExposuresResponse;
     matrixData: ExposuresMatrixResponse | null;
@@ -10,7 +11,7 @@ interface UseApiPollingOptions {
   onError: (error: string) => void;
 }
 
-export function useApiPolling({ refreshInterval, onData, onError }: UseApiPollingOptions) {
+export function useApiPolling({ refreshInterval, mode = 'ALL', onData, onError }: UseApiPollingOptions) {
   const intervalRef = useRef<NodeJS.Timeout | null>(null);
   const abortControllerRef = useRef<AbortController | null>(null);
   const isRequestInProgressRef = useRef<boolean>(false);
@@ -20,7 +21,8 @@ export function useApiPolling({ refreshInterval, onData, onError }: UseApiPollin
   const fetchData = useCallback(async (
     expiration: string,
     metric: MetricType,
-    vixRegime: VixRegimeType
+    vixRegime: VixRegimeType,
+    mode: string = 'ALL'
   ) => {
     // Skip if a request is already in progress
     if (isRequestInProgressRef.current) {
@@ -41,7 +43,8 @@ export function useApiPolling({ refreshInterval, onData, onError }: UseApiPollin
 
     try {
       // Fetch exposures data (removed AbortController to avoid race conditions)
-      const exposuresUrl = `${apiBaseUrl}/api/exposures?expiration=${expiration}&vix_regime=${vixRegime}`;
+      const instrument = mode === '0DTE' ? 'SPXW' : 'SPX';  // Explicit instrument selection
+      const exposuresUrl = `${apiBaseUrl}/api/exposures?expiration=${expiration}&vix_regime=${vixRegime}&mode=${mode}&instrument=${instrument}`;
       console.log('🚀 Starting fetch for:', exposuresUrl);
 
       let exposuresResponse: Response;
@@ -83,7 +86,8 @@ export function useApiPolling({ refreshInterval, onData, onError }: UseApiPollin
 
       // Fetch matrix data if expiration is ALL
       if (expiration === 'ALL') {
-        const matrixUrl = `${apiBaseUrl}/api/exposures_matrix?metric=${metric}&vix_regime=${vixRegime}`;
+        const matrixInstrument = mode === '0DTE' ? 'SPXW' : 'SPX';  // Explicit instrument selection
+        const matrixUrl = `${apiBaseUrl}/api/exposures_matrix?metric=${metric}&vix_regime=${vixRegime}&mode=${mode}&instrument=${matrixInstrument}`;
         console.log('📊 Fetching matrix data from:', matrixUrl);
 
         try {
@@ -147,19 +151,20 @@ export function useApiPolling({ refreshInterval, onData, onError }: UseApiPollin
   const startPolling = useCallback((
     expiration: string,
     metric: MetricType,
-    vixRegime: VixRegimeType
+    vixRegime: VixRegimeType,
+    mode: string = 'ALL'
   ) => {
     // Stop any existing polling
     stopPolling();
 
     // Fetch immediately
-    fetchData(expiration, metric, vixRegime);
+    fetchData(expiration, metric, vixRegime, mode);
 
     // Start interval polling
     intervalRef.current = setInterval(() => {
-      fetchData(expiration, metric, vixRegime);
+      fetchData(expiration, metric, vixRegime, mode);
     }, refreshInterval);
-  }, [fetchData, refreshInterval]);
+  }, [fetchData, refreshInterval, mode]);
 
   const stopPolling = useCallback(() => {
     // Clear interval

@@ -27,7 +27,7 @@ class TestContractExposures:
         )
 
         exposures, greeks = calculate_contract_exposures(
-            contract, spot_price=4700, risk_free_rate=0.045, dividend_yield=0
+            contract, spot_price=4700, risk_free_rate=0.045, dividend_yield=0, mode="ALL"
         )
 
         assert isinstance(exposures, Exposures)
@@ -52,7 +52,7 @@ class TestContractExposures:
         )
 
         exposures, greeks = calculate_contract_exposures(
-            contract, spot_price=4700, risk_free_rate=0.045, dividend_yield=0
+            contract, spot_price=4700, risk_free_rate=0.045, dividend_yield=0, mode="ALL"
         )
 
         assert isinstance(exposures, Exposures)
@@ -77,7 +77,7 @@ class TestContractExposures:
         )
 
         exposures, greeks = calculate_contract_exposures(
-            contract, spot_price=4700, risk_free_rate=0.045, dividend_yield=0
+            contract, spot_price=4700, risk_free_rate=0.045, dividend_yield=0, mode="ALL"
         )
 
         # Should return zero exposures

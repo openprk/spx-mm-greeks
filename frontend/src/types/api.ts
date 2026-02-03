@@ -42,6 +42,7 @@ export interface AggregateData {
   regime_code: string;
   conductivity: string;
   notes: string;
+  market_alerts?: string[]; // Dynamic alerts based on market regime conditions
 }
 
 export interface StrikeData {

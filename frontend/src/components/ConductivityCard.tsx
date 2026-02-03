@@ -4,11 +4,13 @@ import type { ExposuresResponse } from '../types/api';
 interface ConductivityCardProps {
   exposuresData: ExposuresResponse | null;
   loading: boolean;
+  instrument?: string;
 }
 
 const ConductivityCard: React.FC<ConductivityCardProps> = ({
   exposuresData,
-  loading
+  loading,
+  instrument = 'SPX'
 }) => {
 
   if (loading && !exposuresData) {
@@ -60,12 +62,12 @@ const ConductivityCard: React.FC<ConductivityCardProps> = ({
     <div className="card">
       <h3 className="text-lg font-semibold text-gray-900 mb-4">Market Conductivity</h3>
 
-      {/* SPX Spot */}
+      {/* Instrument Spot */}
       <div className="mb-4">
         <div className="text-2xl font-bold text-gray-900">
           {spot.toFixed(2)}
         </div>
-        <div className="text-sm text-gray-600">SPX Spot</div>
+        <div className="text-sm text-gray-600">{instrument} Spot</div>
       </div>
 
       {/* Conductivity Label */}

@@ -1,19 +1,18 @@
-import { useState, useEffect, useRef, Suspense, lazy } from 'react';
-import Controls from './components/Controls';
-import Legend from './components/Legend';
-import ConductivityCard from './components/ConductivityCard';
-import TerrainTable from './components/TerrainTable';
+import { useState, useEffect, useRef } from 'react';
+import StructuralView from './components/StructuralView';
+import DTEView from './components/0DTEView';
+import MarketClock from './components/MarketClock';
 import { useApiPolling } from './hooks/useApiPolling';
 import type { ExposuresResponse, ExposuresMatrixResponse, ExpirationsResponse } from './types/api';
 
-// Lazy load heavy components
-const Heatmap = lazy(() => import('./components/Heatmap'));
-
 function App() {
-  // Control states
-  const [expiration, setExpiration] = useState<string>('2026-01-16'); // Will be updated to first available
+  // Tab state
+  const [activeTab, setActiveTab] = useState<'structural' | '0dte'>('structural');
+
+  // Control states (for structural view)
+  const [expiration, setExpiration] = useState<string>('ALL'); // Start with ALL expirations view
   const [metric, setMetric] = useState<'GEX' | 'DEX' | 'VEX' | 'CEX'>('GEX');
-  const [refreshInterval, setRefreshInterval] = useState<number>(30000); // 30 seconds
+  const [refreshInterval, setRefreshInterval] = useState<number>(10000); // 10 seconds for dynamic alerts
   const [vixRegime, setVixRegime] = useState<'RISING' | 'FALLING' | 'AUTO'>('AUTO');
 
   // Data states
@@ -84,6 +83,23 @@ function App() {
         const expData: ExpirationsResponse = await expResponse.json();
         console.log('📦 Expirations data:', expData);
         setExpirations(expData.expirations);
+
+        // Set first available expiration if we don't have one set
+        // Skip today's date as it might not have options data yet
+        if (expData.expirations && expData.expirations.length > 0) {
+          const today = new Date().toISOString().split('T')[0]; // YYYY-MM-DD format
+          let firstExpiration = expData.expirations[0];
+
+          // If first expiration is today, skip to next available
+          if (firstExpiration === today && expData.expirations.length > 1) {
+            firstExpiration = expData.expirations[1];
+            console.log('📅 Skipped today\'s date, using next available expiration:', firstExpiration);
+          } else {
+            console.log('📅 Set first available expiration:', firstExpiration);
+          }
+
+          setExpiration(firstExpiration);
+        }
       } catch (err) {
         console.error('❌ Failed to load initial data:', err);
         setError('Failed to load initial data');
@@ -104,12 +120,19 @@ function App() {
     }
   }, [expirations]);
 
-  // Handle all polling (initial and changes)
+  // Handle all polling (initial and changes) - only for structural tab
   useEffect(() => {
+    if (activeTab === '0dte') {
+      // Stop polling when on 0DTE tab (0DTEView handles its own polling)
+      stopPolling();
+      return;
+    }
+
     // Start polling when we have expirations loaded and a valid expiration
-    const pollingParams = `${expiration}-${metric}-${vixRegime}`;
+    const pollingParams = `${expiration}-${metric}-${vixRegime}-${refreshInterval}`;
 
     console.log('🔄 Polling useEffect triggered:', {
+      activeTab,
       expirationsLength: expirations.length,
       expiration,
       metric,
@@ -126,7 +149,7 @@ function App() {
       console.log('▶️ Starting polling with params:', { expiration, metric, vixRegime });
       lastPollingParamsRef.current = pollingParams;
       stopPolling();
-      startPolling(expiration, metric, vixRegime);
+      startPolling(expiration, metric, vixRegime, 'ALL');
     } else if (expirations.length === 0 || !expiration) {
       console.log('⏸️ Not starting polling - conditions not met:', {
         reason: expirations.length === 0 ? 'no expirations loaded' : 'no expiration set'
@@ -134,7 +157,7 @@ function App() {
     } else {
       console.log('⏸️ Skipping polling - same parameters as last time');
     }
-  }, [expiration, metric, vixRegime, refreshInterval, expirations.length, startPolling, stopPolling]);
+  }, [activeTab, expiration, metric, vixRegime, refreshInterval, expirations.length, startPolling, stopPolling]);
 
   const handleControlsChange = (
     newExpiration: string,
@@ -148,32 +171,55 @@ function App() {
     setVixRegime(newVixRegime);
   };
 
+
   return (
     <div className="min-h-screen bg-gray-50">
       {/* Header */}
       <header className="bg-white shadow-sm border-b">
         <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-4">
-          <h1 className="text-2xl font-bold text-gray-900">
-            SPX Market Maker Greek Exposures
-          </h1>
-          <p className="text-sm text-gray-600 mt-1">
-            Real-time GEX/DEX/VEX/CEX analysis with regime classification
-          </p>
+          <div className="flex justify-between items-start">
+            <div>
+              <h1 className="text-2xl font-bold text-gray-900">
+                SPX Market Maker Greek Exposures
+              </h1>
+              <p className="text-sm text-gray-600 mt-1">
+                Real-time GEX/DEX/VEX/CEX analysis with regime classification
+              </p>
+            </div>
+
+            {/* Market Clock - Top Right */}
+            <div className="ml-4">
+              <MarketClock />
+            </div>
+          </div>
         </div>
       </header>
 
-      {/* Controls */}
+      {/* Tab Navigation */}
       <div className="bg-white border-b">
-        <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-4">
-          <Controls
-            expiration={expiration}
-            metric={metric}
-            refreshInterval={refreshInterval}
-            vixRegime={vixRegime}
-            expirations={expirations}
-            onChange={handleControlsChange}
-            loading={loading}
-          />
+        <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
+          <nav className="flex space-x-8">
+            <button
+              onClick={() => setActiveTab('structural')}
+              className={`py-4 px-1 border-b-2 font-medium text-sm ${
+                activeTab === 'structural'
+                  ? 'border-blue-500 text-blue-600'
+                  : 'border-transparent text-gray-500 hover:text-gray-700 hover:border-gray-300'
+              }`}
+            >
+              Structure (All Expirations)
+            </button>
+            <button
+              onClick={() => setActiveTab('0dte')}
+              className={`py-4 px-1 border-b-2 font-medium text-sm ${
+                activeTab === '0dte'
+                  ? 'border-orange-500 text-orange-600'
+                  : 'border-transparent text-gray-500 hover:text-gray-700 hover:border-gray-300'
+              }`}
+            >
+              0DTE (SPXW)
+            </button>
+          </nav>
         </div>
       </div>
 
@@ -188,49 +234,23 @@ function App() {
         </div>
       )}
 
-      {/* Main Content */}
+      {/* Main Content - Tabbed Views */}
       <main className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-6">
-        <div className="flex flex-col xl:flex-row gap-6">
-          {/* Heatmap - takes up most space */}
-          <div className="flex-1 xl:flex-[3]">
-            <div className="card h-auto">
-              <Suspense fallback={
-                <div className="flex items-center justify-center h-96">
-                  <div className="text-center">
-                    <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-blue-600 mx-auto mb-4"></div>
-                    <div className="text-gray-600">Loading chart...</div>
-                  </div>
-                </div>
-              }>
-                <Heatmap
-                  matrixData={matrixData}
-                  exposuresData={exposuresData}
-                  metric={metric}
-                  expiration={expiration}
-                  loading={loading}
-                />
-              </Suspense>
-            </div>
-          </div>
-
-          {/* Sidebar - fixed width on large screens */}
-          <div className="w-full xl:w-96 xl:min-w-96 space-y-6">
-            {/* Conductivity Card */}
-            <ConductivityCard
-              exposuresData={exposuresData}
-              loading={loading}
-            />
-
-            {/* Legend */}
-            <Legend />
-
-            {/* Terrain Table */}
-            <TerrainTable
-              exposuresData={exposuresData}
-              loading={loading}
-            />
-          </div>
-        </div>
+        {activeTab === 'structural' ? (
+          <StructuralView
+            expiration={expiration}
+            metric={metric}
+            refreshInterval={refreshInterval}
+            vixRegime={vixRegime}
+            expirations={expirations}
+            loading={loading}
+            exposuresData={exposuresData}
+            matrixData={matrixData}
+            onControlsChange={handleControlsChange}
+          />
+        ) : (
+          <DTEView activeTab={activeTab} />
+        )}
       </main>
     </div>
   );

@@ -4,20 +4,23 @@ import type { ExposuresResponse } from '../types/api';
 interface TerrainTableProps {
   exposuresData: ExposuresResponse | null;
   loading: boolean;
+  mode?: '0DTE' | 'STRUCTURAL';
 }
 
 const TerrainTable: React.FC<TerrainTableProps> = ({
   exposuresData,
-  loading
+  loading,
+  mode = 'STRUCTURAL'
 }) => {
+  // Calculate strike range based on mode (available in render)
+  const strikeRange = mode === '0DTE' ? 400 : 200; // ±400 for 0DTE, ±200 for structural
+
   const terrainData = useMemo(() => {
     if (!exposuresData) return [];
 
     const spot = exposuresData.spot;
-
-    // Filter strikes within ±200 points of spot
     const nearbyStrikes = exposuresData.strikes
-      .filter(strike => Math.abs(strike.strike - spot) <= 200)
+      .filter(strike => Math.abs(strike.strike - spot) <= strikeRange)
       .sort((a, b) => Math.abs(a.strike - spot) - Math.abs(b.strike - spot));
 
     // Also include strikes with pattern flags (even if outside range)
@@ -46,17 +49,23 @@ const TerrainTable: React.FC<TerrainTableProps> = ({
       .slice(0, 10)
       .map(item => item.strike);
 
-    const allStrikes = [...nearbyStrikes, ...flaggedStrikes, ...topWalls]
+    // For 0DTE mode, enforce the range limit on ALL strikes (including flagged and walls)
+    const allStrikesFiltered = [...nearbyStrikes, ...flaggedStrikes, ...topWalls]
+      .filter(strike => mode !== '0DTE' || Math.abs(strike.strike - spot) <= strikeRange)
       .sort((a, b) => Math.abs(a.strike - spot) - Math.abs(b.strike - spot));
 
-    // Limit to top 30 strikes to prevent excessive table height
-    return allStrikes.slice(0, 30);
-  }, [exposuresData]);
+    // Show all relevant strikes (no artificial limit)
+    return allStrikesFiltered;
+  }, [exposuresData, mode]);
 
   const formatExposure = (value: number) => {
-    // Format as millions with K = thousands of millions = billions (UW style)
-    const millions = value / 1000000;
-    return `${millions.toFixed(1)}K`;
+    // Consistent K format: K = thousands of millions (billions)
+    if (Math.abs(value) >= 1000000) {
+      return `${(value / 1000000).toFixed(1)}K`;  // 1M becomes 1.0K (billions)
+    } else if (Math.abs(value) >= 1000) {
+      return `${(value / 1000).toFixed(1)}K`;     // 1K becomes 1.0K (millions)
+    }
+    return value.toFixed(0);
   };
 
   const getRegimeColor = (sign: string) => {
@@ -97,7 +106,7 @@ const TerrainTable: React.FC<TerrainTableProps> = ({
       <h3 className="text-lg font-semibold text-gray-900 mb-4">Strike Terrain</h3>
 
       <div className="text-xs text-gray-500 mb-3">
-        Key strikes within ±200pts of SPX {spot.toFixed(0)}, plus flagged strikes (showing top 30)
+        Key strikes within ±{strikeRange}pts of SPX {spot.toFixed(0)}, plus flagged strikes and exposure walls
       </div>
 
       {/* Educational Context */}
@@ -120,7 +129,7 @@ const TerrainTable: React.FC<TerrainTableProps> = ({
         </div>
       </div>
 
-      <div className="overflow-x-auto">
+      <div className="overflow-auto max-h-96">
         <table className="min-w-full text-xs">
           <thead>
             <tr className="border-b border-gray-200">
@@ -199,7 +208,7 @@ const TerrainTable: React.FC<TerrainTableProps> = ({
                         {strike.classification.split(' — ')[0]}
                       </div>
                       {strike.pattern_flags.length > 0 && (
-                        <div className="mt-1">
+                        <div className="mt-1 space-x-1">
                           {strike.pattern_flags.map(flag => (
                             <span
                               key={flag}

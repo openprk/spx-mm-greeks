@@ -121,6 +121,7 @@ const Controls: React.FC<ControlsProps> = ({
         </select>
       </div>
 
+
       {/* Status Indicator */}
       <div className="flex items-center ml-4">
         <div className={`w-3 h-3 rounded-full ${loading ? 'bg-yellow-400 animate-pulse' : 'bg-green-400'}`}></div>

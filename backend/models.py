@@ -66,6 +66,7 @@ class AggregateData(BaseModel):
     regime_code: str
     conductivity: str
     notes: str
+    market_alerts: List[str] = []  # Dynamic alerts based on market regime conditions
 
 class ExposuresResponse(BaseModel):
     """API response for exposures endpoint"""

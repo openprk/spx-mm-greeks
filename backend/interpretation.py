@@ -22,6 +22,132 @@ def classify_exposure_regime(
 
     return regime, regime_code
 
+def determine_market_alerts(
+    regime: Regime,
+    regime_code: str,
+    vix_regime: str = "AUTO",
+    spot_price: float = 0,
+    key_strikes: List[float] = None,
+    mode: str = "ALL"
+) -> List[str]:
+    """
+    Generate intelligent, contextual market alerts based on regime + spot price combinations.
+    Alerts change meaning based on market conditions and positioning - not just proximity.
+    """
+    if key_strikes is None:
+        key_strikes = []
+
+    alerts = []
+
+    # Analyze regime characteristics for intelligent alerting
+    g, d, v, c = regime.g, regime.d, regime.v, regime.c
+
+    # Determine market momentum and risk context
+    is_bullish_momentum = (g == "+" and d == "+" and c == "-")  # Compression + buying
+    is_bearish_momentum = (g == "-" and d == "-" and c == "+")  # Acceleration bearish
+    is_high_volatility = (g == "-" and v == "+")  # Negative GEX + positive VEX
+    is_low_volatility = (g == "+" and v == "-")  # Positive GEX + negative VEX
+    is_time_decay_critical = (c == "+" or c == "-")  # Charm has significant impact
+
+    # Context-aware alerts based on regime + spot price positioning
+    if key_strikes and spot_price > 0:
+        # Find nearest strikes above and below current price
+        strikes_above = [s for s in key_strikes if s > spot_price]
+        strikes_below = [s for s in key_strikes if s < spot_price]
+
+        # RESISTANCE LEVEL ALERTS - Context matters!
+        if strikes_above:
+            nearest_resistance = min(strikes_above)
+            distance_to_resistance = (nearest_resistance - spot_price) / spot_price
+
+            if distance_to_resistance < 0.01:  # Within 1% of resistance
+                if is_bullish_momentum:
+                    if distance_to_resistance < 0.002:  # Very close
+                        alerts.append("BULLISH_BREAKOUT_IMMINENT")
+                    else:
+                        alerts.append("COMPRESSION_TEST_OF_RESISTANCE")
+                elif is_bearish_momentum:
+                    alerts.append("BEARISH_RESISTANCE_REJECTION_LIKELY")
+                elif is_high_volatility:
+                    alerts.append("VOLATILE_RESISTANCE_PIN_RISK")
+                else:
+                    alerts.append("NEUTRAL_RESISTANCE_APPROACH")
+
+        # SUPPORT LEVEL ALERTS - Context matters!
+        if strikes_below:
+            nearest_support = max(strikes_below)
+            distance_to_support = (spot_price - nearest_support) / spot_price
+
+            if distance_to_support < 0.01:  # Within 1% of support
+                if is_bearish_momentum:
+                    if distance_to_support < 0.002:  # Very close
+                        alerts.append("BEARISH_BREAKDOWN_IMMINENT")
+                    else:
+                        alerts.append("ACCELERATION_TEST_OF_SUPPORT")
+                elif is_bullish_momentum:
+                    alerts.append("BULLISH_SUPPORT_DEFENSE_STRONG")
+                elif is_high_volatility:
+                    alerts.append("VOLATILE_SUPPORT_PIN_RISK")
+                else:
+                    alerts.append("NEUTRAL_SUPPORT_APPROACH")
+
+    # REGIME-SPECIFIC PATTERN ALERTS (from MD files)
+    if regime_code == "G- D- V- C+":
+        alerts.append("MAX_DOWNSIDE_ACCELERATION")
+        # Additional context for this dangerous pattern
+        if mode == "0DTE":
+            alerts.append("EXTREME_0DTE_RISK_SETUP")
+
+    elif regime_code == "G+ D+ V+ C-":
+        alerts.append("COMPRESSION_PIN_SETUP")
+        if mode == "0DTE":
+            alerts.append("HIGH_PROBABILITY_0DTE_PIN")
+
+    elif regime_code == "G- D- V+ C-":
+        alerts.append("VOL_CUSHION_TRAP_ACTIVE")
+        alerts.append("MOMENTUM_WITH_VOLATILITY_BUFFER")
+
+    elif regime_code == "G+ D+ V- C+":
+        alerts.append("BOUNCE_CANDIDATE_ACTIVE")
+        alerts.append("REVERSAL_SETUP_FAVORABLE")
+
+    # VIX REGIME CONTEXT (when available)
+    if vix_regime == "RISING" and is_high_volatility:
+        alerts.append("VIX_SPIKE_AMPLIFYING_VOLATILITY")
+    elif vix_regime == "FALLING" and is_bullish_momentum:
+        alerts.append("VIX_CALM_SUPPORTING_UPSIDE")
+
+    # 0DTE-SPECIFIC CONTEXT
+    if mode == "0DTE":
+        alerts.append("TRADING_0DTE_SESSION")
+
+        # Time-based risk escalation for 0DTE
+        from datetime import datetime
+        now = datetime.now()
+        hour = now.hour
+
+        if hour < 10:
+            alerts.append("EARLY_0DTE_LOW_RISK_PERIOD")
+        elif hour > 15:
+            alerts.append("LATE_0DTE_HIGH_RISK_PERIOD")
+            if is_time_decay_critical:
+                alerts.append("CRITICAL_TIME_DECAY_WINDOW")
+        else:
+            alerts.append("MID_0DTE_ACTIVE_PERIOD")
+
+        # 0DTE-specific regime warnings
+        if is_high_volatility and (is_bearish_momentum or is_bullish_momentum):
+            alerts.append("0DTE_EXTREME_REGIME_RISK")
+
+    # HIGH-RISK COMBINATIONS
+    if is_bearish_momentum and is_high_volatility and mode == "0DTE":
+        alerts.append("MAX_RISK_0DTE_SETUP")
+
+    if is_bullish_momentum and is_time_decay_critical and distance_to_resistance < 0.005:
+        alerts.append("TIME_DECAY_BREAKOUT_OPPORTUNITY")
+
+    return alerts
+
 def determine_conductivity(
     regime: Regime,
     vix_regime: str = "AUTO"
@@ -58,6 +184,10 @@ def determine_conductivity(
             # Bounce candidate - compression + buying pressure + vol cushion
             return "BOUNCE_CANDIDATE", "Strong compression with buying pressure and volatility cushion. Potential reversal setup zone."
 
+        elif d == '-' and v == '-' and c == '+':
+            # Acceleration zone down - extreme bearish alignment, no support structure
+            return "ACCELERATION_DOWN", "Extreme bearish alignment with negative GEX amplification. Maximum downward momentum acceleration expected."
+
     elif g == '+':
         if d == '+' and v == '+' and c == '-':
             # Ceiling/magnet - extreme compression + directional buying support
@@ -73,23 +203,29 @@ def determine_conductivity(
 def classify_strike_terrain(
     regime_code: str,
     spot_price: float,
-    strike: float
+    strike: float,
+    gex: float = 0,
+    dex: float = 0,
+    vex: float = 0,
+    cex: float = 0
 ) -> Tuple[str, List[str]]:
 
     pattern_flags = []
 
-    # Maximum downside acceleration pattern
+    # Guide-compliant strike-level alerts (only the specified one)
     if regime_code == "G- D- V- C+":
         pattern_flags.append("MAX_DOWNSIDE_ACCELERATION")
 
     # Terrain mapping based on regime codes
+    # Note: Guide specifies normalization of duplicates to one canonical mapping
+    # Precedence for "G- D- V+ C-": "HIGH-VELOCITY DOWN" chosen as it appears first in guide
+    # Precedence for "G+ D+ V- C+": "BOUNCE CANDIDATE" chosen as it appears first in guide
     terrain_map = {
+        # Core terrain classifications (exactly as specified in guide)
         "G+ D+ V+ C-": "CEILING/MAGNET — Extreme compression + directional buying support. Pin behavior expected.",
         "G- D- V- C+": "ACCELERATION ZONE (DOWN) — All directional Greeks aligned bearish. No support structure.",
         "G- D- V+ C-": "HIGH-VELOCITY DOWN — Momentum amplified, but VEX provides vol-spike cushion. Trapped longs above.",
         "G+ D+ V- C+": "BOUNCE CANDIDATE — Compression + buying pressure + vol-spike cushion. Reversal setup zone.",
-        "G- D- V+ C-": "CONDITIONAL VOID — Accelerates down, BUT vol spike triggers MM buying (V+ override).",
-        "G+ D+ V- C+": "STRUCTURAL SUPPORT — Strong compression + aggressive MM buying. High-probability floor.",
     }
 
     classification = terrain_map.get(regime_code, "NEUTRAL — No significant terrain features identified.")

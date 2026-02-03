@@ -9,11 +9,12 @@ def calculate_contract_exposures(
     spot_price: float,
     risk_free_rate: float,
     dividend_yield: float,
+    mode: str = "ALL",
     log_skipped: bool = True
 ) -> Tuple[Exposures, Greeks]:
 
-    # Calculate time to expiration
-    T = calculate_time_to_expiration(contract.expiration_date)
+    # Calculate time to expiration with mode-specific precision
+    T = calculate_time_to_expiration(contract.expiration_date, mode)
 
     # Use provided Greeks with validation and defaults for missing values
     delta = contract.delta if contract.delta is not None else 0.0
@@ -130,7 +131,8 @@ def aggregate_by_strike(
     contracts: List[OptionContract],
     spot_price: float,
     risk_free_rate: float,
-    dividend_yield: float
+    dividend_yield: float,
+    mode: str = "ALL"
 ) -> Dict[float, Dict]:
 
     print(f"🔍 aggregate_by_strike called with {len(contracts)} contracts")
@@ -142,7 +144,7 @@ def aggregate_by_strike(
 
     for contract in contracts:
         exposures, greeks = calculate_contract_exposures(
-            contract, spot_price, risk_free_rate, dividend_yield
+            contract, spot_price, risk_free_rate, dividend_yield, mode
         )
 
         strike = contract.strike
@@ -169,7 +171,8 @@ def aggregate_by_strike_with_logging(
     contracts: List[OptionContract],
     spot_price: float,
     risk_free_rate: float = 0.045,
-    dividend_yield: float = 0.0
+    dividend_yield: float = 0.0,
+    mode: str = "ALL"
 ) -> Dict[float, Dict]:
     """
     Aggregate exposures by strike with logging for skipped contracts.
@@ -187,7 +190,7 @@ def aggregate_by_strike_with_logging(
     for contract in contracts:
         try:
             exposures, greeks = calculate_contract_exposures(
-                contract, spot_price, risk_free_rate, dividend_yield, log_skipped=False
+                contract, spot_price, risk_free_rate, dividend_yield, mode, log_skipped=False
             )
 
             # Check if contract was effectively skipped (all exposures are 0)

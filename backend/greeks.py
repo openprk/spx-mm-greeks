@@ -63,14 +63,50 @@ def calculate_greeks(
         charm=float(charm)
     )
 
-def calculate_time_to_expiration(expiration_date: str) -> float:
+def calculate_time_to_expiration(expiration_date: str, mode: str = "ALL") -> float:
+    """
+    Calculate time to expiration with minute precision for 0DTE mode.
+    For 0DTE: uses exact expiry time (4:00 PM ET)
+    For other modes: uses date-based approximation
+    """
     try:
-        exp_date = datetime.strptime(expiration_date, "%Y-%m-%d")
-        now = datetime.now()
-        time_diff = exp_date - now
-        return max(0, time_diff.total_seconds() / (365.25 * 24 * 3600))  # Convert to years
+        if mode == "0DTE":
+            # For 0DTE: use exact minute-precise expiry time (4:00 PM ET)
+            exp_date = datetime.strptime(expiration_date, "%Y-%m-%d")
+
+            # Create expiry datetime at 4:00 PM ET (16:00)
+            expiry_naive = exp_date.replace(hour=16, minute=0, second=0, microsecond=0)
+
+            # Convert to UTC (ET is typically UTC-5, but handle daylight saving)
+            # Use US/Eastern timezone for accuracy
+            try:
+                import pytz
+                eastern = pytz.timezone('US/Eastern')
+                expiry_et = eastern.localize(expiry_naive)
+                expiry_utc = expiry_et.astimezone(pytz.UTC)
+            except ImportError:
+                # Fallback: assume standard time (UTC-5), can be UTC-4 during DST
+                # This is approximate but better than date-only calculation
+                et_tz = timezone(timedelta(hours=-5))  # ET standard time
+                expiry_et = expiry_naive.replace(tzinfo=et_tz)
+                expiry_utc = expiry_et.astimezone(timezone.utc)
+
+            now_utc = datetime.now(timezone.utc)
+            time_remaining = expiry_utc - now_utc
+
+            # Return as fraction of year for Black-Scholes compatibility
+            years_remaining = max(0, time_remaining.total_seconds() / (365.25 * 24 * 3600))
+
+            print(f"0DTE precise time calculation: {years_remaining:.6f} years remaining")
+            return years_remaining
+        else:
+            # Standard date-based calculation for longer expirations
+            exp_date = datetime.strptime(expiration_date, "%Y-%m-%d")
+            now = datetime.now()
+            time_diff = exp_date - now
+            return max(0, time_diff.total_seconds() / (365.25 * 24 * 3600))
     except ValueError:
         return 0.0
 
 # Import here to avoid circular imports
-from datetime import datetime
+from datetime import datetime, timezone, timedelta

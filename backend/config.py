@@ -5,6 +5,8 @@ class Settings(BaseSettings):
     risk_free_rate: float = 0.045
     dividend_yield: float = 0.0
     cache_ttl_seconds: int = 60
+    # Separate TTL for real-time alert data
+    alert_cache_ttl_seconds: int = 10  # 10 seconds for dynamic alerts
     allowed_origins: str = "http://localhost:5173"
 
     class Config:

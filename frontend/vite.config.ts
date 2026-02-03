@@ -10,19 +10,6 @@ export default defineConfig({
     port: 5173,
     host: true
   },
-  build: {
-    rollupOptions: {
-      output: {
-        manualChunks: {
-          // Separate Plotly.js into its own chunk (very large library)
-          plotly: ['plotly.js'],
-          'react-plotly': ['react-plotly.js']
-        }
-      }
-    },
-    // Increase chunk size warning limit since we're intentionally chunking
-    chunkSizeWarningLimit: 1000
-  },
   define: {
     'process.env': {},
   },

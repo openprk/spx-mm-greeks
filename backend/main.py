@@ -773,10 +773,10 @@ async def get_chain_data(expiration: str, spot_price: float = None, mode: str = 
         if spot_price is not None:
             original_count = len(options)
             if instrument == "SPXW" or mode == "0DTE":
-                # Optimized filtering for 0DTE: ±100-150 points from spot for faster processing
-                min_strike = spot_price - 100
-                max_strike = spot_price + 150  # Balanced range for intraday analysis
-                # Optimized strike filtering for 0DTE performance
+                # Roberto's specification: ±200-400 points from spot for comprehensive 0DTE analysis
+                min_strike = spot_price - 200
+                max_strike = spot_price + 400  # Wider range captures important OTM strikes
+                # Critical for accurate gamma exposure in 0DTE - don't miss far OTM strikes
             else:
                 # Standard filtering for SPX: ±30% of spot price
                 min_strike = spot_price * 0.7

@@ -115,6 +115,7 @@ class SpotResponse(BaseModel):
     ask: float
     volume: int
     timestamp: str
+    trade_date: Optional[int] = None  # Unix timestamp in seconds, 0 if stale
 
 class HealthResponse(BaseModel):
     """API response for health endpoint"""

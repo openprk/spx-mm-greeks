@@ -3,55 +3,38 @@ import Heatmap from './Heatmap';
 import ConductivityCard from './ConductivityCard';
 import TerrainTable from './TerrainTable';
 import Legend from './Legend';
-import { useApiPolling } from '../hooks/useApiPolling';
 import type { ExposuresResponse } from '../types/api';
 
 interface DTEViewProps {
   activeTab: 'structural' | '0dte';
+  exposuresData: ExposuresResponse | null;
+  loading: boolean;
 }
 
-const DTEView: React.FC<DTEViewProps> = ({ activeTab }) => {
-  // 0DTE-specific states - always use 0DTE mode
-  const [exposuresData, setExposuresData] = useState<ExposuresResponse | null>(null);
-  const [loading, setLoading] = useState<boolean>(true);
-  const [error, setError] = useState<string | null>(null);
+const DTEView: React.FC<DTEViewProps> = ({ activeTab, exposuresData, loading }) => {
+  const [spxwQuote, setSpxwQuote] = useState<any>(null);
 
-  // Fixed settings for 0DTE view
-  const mode = '0DTE';
-  const metric = 'GEX'; // Focus on GEX as amplifier
-  const refreshInterval = 1000; // 1 second for intraday
-  const vixRegime = 'AUTO';
-  const expiration = 'ALL'; // 0DTE aggregates today's data
-
-  // Initialize polling hook with 0DTE settings
-  const { startPolling, stopPolling } = useApiPolling({
-    refreshInterval,
-    onData: (data) => {
-      setExposuresData(data.exposuresData);
-      setLoading(false);
-      setError(null);
-    },
-    onError: (err) => {
-      setError(err);
-      setLoading(false);
-    },
-  });
-
-  // Start polling only when 0DTE tab is active
+  // Fetch SPXW quote for diagnostic purposes when 0DTE tab is active
   useEffect(() => {
     if (activeTab === '0dte') {
-      console.log('🚀 Starting 0DTE polling - tab is active');
-      startPolling(expiration, metric, vixRegime, mode);
-    } else {
-      console.log('⏸️ 0DTE tab not active, stopping polling');
-      stopPolling();
+      const fetchSpxwQuote = async () => {
+        try {
+          const apiBaseUrl = (import.meta as any).env?.VITE_API_BASE_URL || 'http://localhost:8000';
+          const response = await fetch(`${apiBaseUrl}/api/spxw_quote`);
+          if (response.ok) {
+            const data = await response.json();
+            setSpxwQuote(data);
+          } else {
+            console.warn('SPXW quote fetch failed:', response.status, response.statusText);
+          }
+        } catch (err) {
+          console.warn('Failed to fetch SPXW quote:', err);
+          // Don't set error state for SPXW quote failures - it's just diagnostic
+        }
+      };
+      fetchSpxwQuote();
     }
-
-    return () => {
-      console.log('🛑 Cleaning up 0DTE polling');
-      stopPolling();
-    };
-  }, [activeTab, startPolling, stopPolling]);
+  }, [activeTab]);
 
   return (
     <div className="space-y-6">
@@ -125,7 +108,7 @@ const DTEView: React.FC<DTEViewProps> = ({ activeTab }) => {
               matrixData={null}
               exposuresData={exposuresData}
               metric="GEX"
-              expiration={expiration}
+              expiration={exposuresData?.expiration || '0DTE'}
               loading={loading}
             />
           </div>
@@ -139,6 +122,19 @@ const DTEView: React.FC<DTEViewProps> = ({ activeTab }) => {
             loading={loading}
             instrument="SPX"
           />
+
+          {/* SPXW Diagnostic (shows SPXW quote for comparison) */}
+          {spxwQuote && (
+            <div className="card bg-gray-50 border-gray-300">
+              <div className="text-sm font-medium text-gray-700 mb-2">SPXW Quote (Diagnostic)</div>
+              <div className="text-lg font-semibold text-gray-900">
+                {spxwQuote.last?.toFixed(2)}
+              </div>
+              <div className="text-xs text-gray-600 mt-1">
+                SPXW is "S&P Weeklys dummy underlying" - used for weekly options
+              </div>
+            </div>
+          )}
 
           {/* Market Alerts - Dynamic based on regime */}
           <Legend exposuresData={exposuresData} />
@@ -170,17 +166,6 @@ const DTEView: React.FC<DTEViewProps> = ({ activeTab }) => {
         </div>
       </div>
 
-      {/* Error State */}
-      {error && (
-        <div className="card border-red-200 bg-red-50">
-          <div className="text-red-800">
-            <strong>0DTE Data Error:</strong> {error}
-          </div>
-          <div className="text-sm text-red-600 mt-2">
-            Check market hours - 0DTE data only available during regular trading hours.
-          </div>
-        </div>
-      )}
     </div>
   );
 };

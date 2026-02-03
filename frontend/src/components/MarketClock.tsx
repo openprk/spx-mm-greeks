@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useMemo } from 'react';
 
 interface MarketClockData {
   clock: {
@@ -22,6 +22,7 @@ interface CalendarData {
 }
 
 const MarketClock: React.FC = () => {
+  // Force recompile with updated code - v2
   const [clockData, setClockData] = useState<MarketClockData | null>(null);
   const [calendarData, setCalendarData] = useState<CalendarData | null>(null);
   const [loading, setLoading] = useState(true);
@@ -115,23 +116,19 @@ const MarketClock: React.FC = () => {
     }
   };
 
-  const getNextTradingDay = () => {
+  const nextTradingDay = useMemo(() => {
     if (!calendarData?.calendar?.days?.day || !Array.isArray(calendarData.calendar.days.day)) {
-      console.log('No calendar days available');
       return null;
     }
 
     const today = new Date().toISOString().split('T')[0]; // YYYY-MM-DD format
-    console.log('Looking for next trading day after:', today);
 
     try {
       // Find next trading day (open or early_close status)
       for (const day of calendarData.calendar.days.day) {
-        console.log('Checking day:', day);
         if (day && typeof day === 'object' && day.date && day.status) {
           if (day.date > today && (day.status === 'open' || day.status === 'early_close')) {
             // Always skip today - we want the NEXT trading day
-            console.log('Found next trading day:', day);
             return {
               date: day.date,
               status: day.status,
@@ -140,14 +137,13 @@ const MarketClock: React.FC = () => {
           }
         }
       }
-      console.log('No trading days found in calendar');
     } catch (error) {
       console.warn('Error processing calendar data:', error);
       return null;
     }
 
     return null;
-  };
+  }, [calendarData]);
 
   if (loading) {
     return (
@@ -196,29 +192,28 @@ const MarketClock: React.FC = () => {
         <div className="text-gray-500">Last updated: {formatTime(clock.timestamp)}</div>
       </div>
 
-      {/* Next Events */}
-      {(clock.next_change || clock.next_state || getNextTradingDay()) && (
-        <div className="mt-2 pt-2 border-t border-gray-100">
-          <div className="text-xs text-gray-500 space-y-1">
-            {clock.next_change && clock.next_state && (
-              <div>Next: {clock.next_change} ({clock.next_state})</div>
-            )}
-            {getNextTradingDay() && (() => {
-              const nextDay = getNextTradingDay();
-              console.log('UI: nextDay:', nextDay, 'clock.date:', clock.date, 'comparison:', nextDay?.date !== clock.date);
-              if (nextDay && nextDay.date !== clock.date) {
-                return (
-                  <div className="text-blue-600">
-                    Next Trading Day: {new Date(nextDay.date).toLocaleDateString()}
-                    {nextDay.status === 'early_close' && ' (Early Close)'}
-                  </div>
-                );
-              }
-              return null;
-            })()}
+      {/* Next Events Section */}
+      {(() => {
+        const hasNextEvent = clock.next_change || clock.next_state || nextTradingDay;
+
+        if (!hasNextEvent) return null;
+
+        return (
+          <div className="mt-2 pt-2 border-t border-gray-100">
+            <div className="text-xs text-gray-500 space-y-1">
+              {clock.next_change && clock.next_state && (
+                <div>Next: {clock.next_change} ({clock.next_state})</div>
+              )}
+              {nextTradingDay && nextTradingDay.date !== clock.date && (
+                <div className="text-blue-600">
+                  Next Trading Day: {new Date(nextTradingDay.date).toLocaleDateString()}
+                  {nextTradingDay.status === 'early_close' && ' (Early Close)'}
+                </div>
+              )}
+            </div>
           </div>
-        </div>
-      )}
+        );
+      })()}
     </div>
   );
 };

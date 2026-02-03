@@ -29,33 +29,17 @@ function App() {
   const { startPolling, stopPolling } = useApiPolling({
     refreshInterval,
     onData: (data) => {
-      console.log('🎯 onData received:', {
-        hasExposuresData: !!data.exposuresData,
-        hasMatrixData: !!data.matrixData,
-        exposuresDataKeys: data.exposuresData ? Object.keys(data.exposuresData) : null,
-        matrixDataKeys: data.matrixData ? Object.keys(data.matrixData) : null,
-        expiration,
-        timestamp: new Date().toISOString()
-      });
 
-      if (data.exposuresData) {
-        console.log('✅ Setting exposuresData:', {
-          expiration: data.exposuresData.expiration,
-          strikesCount: data.exposuresData.strikes?.length || 0
-        });
-      }
-
-      if (data.matrixData) {
-        console.log('✅ Setting matrixData:', {
-          hasZ: !!data.matrixData.z,
-          expirationsCount: data.matrixData.x_expirations?.length || 0
-        });
-      }
-
-      if (expiration === 'ALL') {
-        setMatrixData(data.matrixData);
+      if (activeTab === 'structural') {
+        // Structural tab: set both exposures and matrix data as before
+        if (expiration === 'ALL') {
+          setMatrixData(data.matrixData);
+        } else {
+          setMatrixData(null);
+        }
         setExposuresData(data.exposuresData);
-      } else {
+      } else if (activeTab === '0dte') {
+        // 0DTE tab: only set exposures data, clear matrix data
         setExposuresData(data.exposuresData);
         setMatrixData(null);
       }
@@ -120,44 +104,39 @@ function App() {
     }
   }, [expirations]);
 
-  // Handle all polling (initial and changes) - only for structural tab
+  // Handle all polling for both tabs
   useEffect(() => {
-    if (activeTab === '0dte') {
-      // Stop polling when on 0DTE tab (0DTEView handles its own polling)
-      stopPolling();
-      return;
-    }
+    // Stop polling first to clear any existing polling
+    stopPolling();
 
-    // Start polling when we have expirations loaded and a valid expiration
-    const pollingParams = `${expiration}-${metric}-${vixRegime}-${refreshInterval}`;
-
-    console.log('🔄 Polling useEffect triggered:', {
-      activeTab,
-      expirationsLength: expirations.length,
-      expiration,
-      metric,
-      vixRegime,
-      refreshInterval,
-      loading,
-      hasExpirations: expirations.length > 0,
-      hasExpiration: !!expiration,
-      lastParams: lastPollingParamsRef.current,
-      newParams: pollingParams
-    });
-
-    if (expirations.length > 0 && expiration && pollingParams !== lastPollingParamsRef.current) {
-      console.log('▶️ Starting polling with params:', { expiration, metric, vixRegime });
-      lastPollingParamsRef.current = pollingParams;
-      stopPolling();
-      startPolling(expiration, metric, vixRegime, 'ALL');
-    } else if (expirations.length === 0 || !expiration) {
-      console.log('⏸️ Not starting polling - conditions not met:', {
-        reason: expirations.length === 0 ? 'no expirations loaded' : 'no expiration set'
-      });
-    } else {
-      console.log('⏸️ Skipping polling - same parameters as last time');
+    if (activeTab === 'structural') {
+      // Structure tab polling
+      if (expirations.length > 0 && expiration) {
+        const pollingParams = `${expiration}-${metric}-${vixRegime}-${refreshInterval}`;
+        if (pollingParams !== lastPollingParamsRef.current) {
+          lastPollingParamsRef.current = pollingParams;
+          startPolling(expiration, metric, vixRegime, 'ALL');
+        }
+      }
+    } else if (activeTab === '0dte') {
+      // 0DTE tab polling - use today's date for single expiration (not ALL)
+      // 0DTE should refresh at 1s intervals as per specification
+      const today = new Date().toISOString().split('T')[0]; // YYYY-MM-DD format
+      const pollingParams = `0DTE-${metric}-AUTO-1000`; // 1 second refresh for 0DTE
+      if (pollingParams !== lastPollingParamsRef.current) {
+        lastPollingParamsRef.current = pollingParams;
+        startPolling(today, metric, 'AUTO', '0DTE', 1000); // 1 second refresh
+      }
     }
   }, [activeTab, expiration, metric, vixRegime, refreshInterval, expirations.length, startPolling, stopPolling]);
+
+  // Reset data when switching tabs to prevent stale data
+  useEffect(() => {
+    setLoading(true);
+    setError(null);
+    setExposuresData(null);
+    setMatrixData(null);
+  }, [activeTab]);
 
   const handleControlsChange = (
     newExpiration: string,
@@ -249,7 +228,11 @@ function App() {
             onControlsChange={handleControlsChange}
           />
         ) : (
-          <DTEView activeTab={activeTab} />
+          <DTEView
+            activeTab={activeTab}
+            exposuresData={exposuresData}
+            loading={loading}
+          />
         )}
       </main>
     </div>

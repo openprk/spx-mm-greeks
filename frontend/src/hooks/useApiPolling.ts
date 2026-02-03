@@ -152,7 +152,8 @@ export function useApiPolling({ refreshInterval, mode = 'ALL', onData, onError }
     expiration: string,
     metric: MetricType,
     vixRegime: VixRegimeType,
-    mode: string = 'ALL'
+    mode: string = 'ALL',
+    customRefreshInterval?: number
   ) => {
     // Stop any existing polling
     stopPolling();
@@ -160,10 +161,11 @@ export function useApiPolling({ refreshInterval, mode = 'ALL', onData, onError }
     // Fetch immediately
     fetchData(expiration, metric, vixRegime, mode);
 
-    // Start interval polling
+    // Start interval polling with custom interval if provided, otherwise use default
+    const intervalMs = customRefreshInterval ?? refreshInterval;
     intervalRef.current = setInterval(() => {
       fetchData(expiration, metric, vixRegime, mode);
-    }, refreshInterval);
+    }, intervalMs);
   }, [fetchData, refreshInterval, mode]);
 
   const stopPolling = useCallback(() => {

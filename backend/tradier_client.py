@@ -27,7 +27,8 @@ class TradierClient:
                     "bid": quote.get("bid") or 0,  # Handle None values
                     "ask": quote.get("ask") or 0,  # Handle None values
                     "volume": quote.get("volume") or 0,
-                    "timestamp": str(quote.get("trade_date") or "")  # Ensure string
+                    "timestamp": str(quote.get("trade_date") or ""),  # Ensure string
+                    "trade_date": quote.get("trade_date") or 0  # Raw trade_date for data integrity checks
                 }
             else:
                 raise ValueError("Invalid SPX quote response from Tradier")
@@ -51,7 +52,8 @@ class TradierClient:
                         "bid": quote.get("bid") or 0,
                         "ask": quote.get("ask") or 0,
                         "volume": quote.get("volume") or 0,
-                        "timestamp": str(quote.get("trade_date") or "")
+                        "timestamp": str(quote.get("trade_date") or ""),
+                        "trade_date": quote.get("trade_date") or 0,  # Raw trade_date for data integrity checks
                     }
                 else:
                     # Fallback to SPX quote if SPXW not available

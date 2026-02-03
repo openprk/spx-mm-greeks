@@ -97,7 +97,7 @@ def calculate_time_to_expiration(expiration_date: str, mode: str = "ALL") -> flo
             # Return as fraction of year for Black-Scholes compatibility
             years_remaining = max(0, time_remaining.total_seconds() / (365.25 * 24 * 3600))
 
-            print(f"0DTE precise time calculation: {years_remaining:.6f} years remaining")
+            # Removed excessive debug logging for time calculations
             return years_remaining
         else:
             # Standard date-based calculation for longer expirations

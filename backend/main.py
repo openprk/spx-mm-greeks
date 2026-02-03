@@ -321,6 +321,22 @@ async def get_expirations():
     except Exception as e:
         raise HTTPException(status_code=500, detail=f"Failed to fetch expirations: {str(e)}")
 
+@app.get("/api/spxw_quote", response_model=SpotResponse)
+async def get_spxw_quote():
+    """Get current SPXW spot quote (diagnostic)"""
+    cache_key = "spxw_quote"
+
+    if cache_key in spot_cache:
+        return spot_cache[cache_key]
+
+    try:
+        spxw_data = await tradier_client.get_spxw_quote()
+        response = SpotResponse(**spxw_data)
+        spot_cache[cache_key] = response
+        return response
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=f"Failed to fetch SPXW quote: {str(e)}")
+
 @app.get("/api/exposures", response_model=ExposuresResponse)
 async def get_exposures(
     expiration: str = Query(..., description="Expiration date (YYYY-MM-DD) or 'ALL'"),
@@ -380,9 +396,40 @@ async def get_exposures(
     try:
         # Use single-flight pattern to prevent concurrent recomputations
         async with exposures_lock:
-            # Get spot price
+            # Get spot price with data integrity checks
             spot_response = await get_spot()
             spot_price = spot_response.last
+
+            # DATA INTEGRITY CHECK: Compare SPX vs SPXW quotes for consistency
+            try:
+                spxw_response = await tradier_client.get_spxw_quote()
+                spxw_price = spxw_response.get("last", spot_price)
+                price_delta = abs(spot_price - spxw_price)
+
+                print(f"🔍 Spot price integrity: SPX={spot_price:.2f}, SPXW={spxw_price:.2f}, delta={price_delta:.2f}")
+
+                # Flag if delta > 2 points (significant discrepancy)
+                if price_delta > 2.0:
+                    print(f"⚠️ LARGE SPX-SPXW DELTA ({price_delta:.2f} points) - potential data inconsistency")
+
+                # Flag if SPX trade_date indicates stale/derived data
+                if spot_response.trade_date == 0:
+                    print(f"⚠️ SPX TRADE_DATE = 0 - data may be stale/derived, not real-time")
+                    # Fallback to SPXW if available and delta is reasonable
+                    if price_delta <= 2.0:
+                        print(f"🔄 FALLBACK: Using SPXW price ({spxw_price:.2f}) due to stale SPX data")
+                        spot_price = spxw_price
+                        spot_response = SpotResponse(**spxw_response)
+                    else:
+                        print(f"⚠️ NOT FALLING BACK: SPXW delta too large ({price_delta:.2f})")
+
+            except Exception as e:
+                print(f"⚠️ SPX-SPXW integrity check failed: {e} - continuing with SPX data")
+
+            # GUARDRAIL: Ensure we're using SPX-derived pricing for consistency
+            if mode == "0DTE":
+                assert spot_response.symbol == "SPX", f"0DTE mode must use SPX spot for calculations, got {spot_response.symbol}"
+                print(f"✅ 0DTE guardrail passed: Using {spot_response.symbol} spot ({spot_price}) for calculations")
 
             # Get data based on expiration
             if expiration == "ALL":
@@ -707,16 +754,29 @@ async def get_chain_data(expiration: str, spot_price: float = None, mode: str = 
                 status_code=503,
                 detail=f"No options market data available for expiration {expiration}. Unable to calculate Greek exposures. API Error: {str(e)}"
             )
-        options = chain_data.get("options", [])
+        # Extract options list from chain data, handling different response structures
+        options_data = chain_data.get("options", [])
+        if isinstance(options_data, dict):
+            option_value = options_data.get("option")
+            if option_value is None:
+                options = []
+            elif isinstance(option_value, list):
+                options = option_value
+            else:
+                options = [option_value]
+        elif isinstance(options_data, list):
+            options = options_data
+        else:
+            options = []
 
         # Filter options based on mode
         if spot_price is not None:
             original_count = len(options)
             if instrument == "SPXW" or mode == "0DTE":
-                # Tighter filtering for SPXW/0DTE: ±200-400 points from spot
-                min_strike = spot_price - 200
-                max_strike = spot_price + 400  # Allow wider range on upside for SPXW
-                print(f"🔥 SPXW/0DTE mode: Using tight strike filter (±200-400pts: {min_strike:.0f}-{max_strike:.0f})")
+                # Optimized filtering for 0DTE: ±100-150 points from spot for faster processing
+                min_strike = spot_price - 100
+                max_strike = spot_price + 150  # Balanced range for intraday analysis
+                # Optimized strike filtering for 0DTE performance
             else:
                 # Standard filtering for SPX: ±30% of spot price
                 min_strike = spot_price * 0.7

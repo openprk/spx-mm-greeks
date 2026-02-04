@@ -122,15 +122,15 @@ const TerrainTable: React.FC<TerrainTableProps> = ({
   const spot = exposuresData.spot;
 
   return (
-    <div className="card">
-      <h3 className="text-lg font-semibold text-gray-900 mb-4">Strike Terrain</h3>
+    <div className="card h-full flex flex-col">
+      <h3 className="text-lg xl:text-xl 2xl:text-2xl font-semibold text-gray-900 mb-4">Strike Terrain</h3>
 
-      <div className="text-xs text-gray-500 mb-3">
+      <div className="text-xs xl:text-sm text-gray-500 mb-3">
         Key strikes within ±{strikeRange}pts of SPX {spot.toFixed(0)}, plus flagged strikes and exposure walls
       </div>
 
       {/* Educational Context */}
-      <div className="mb-4 text-xs text-gray-600 bg-blue-50 p-3 rounded border border-blue-200">
+      <div className="mb-4 text-xs xl:text-sm text-gray-600 bg-blue-50 p-3 rounded border border-blue-200">
         <div className="font-medium text-blue-900 mb-2">Understanding Strike Terrain:</div>
         <div className="grid grid-cols-2 gap-2">
           <div>
@@ -149,16 +149,16 @@ const TerrainTable: React.FC<TerrainTableProps> = ({
         </div>
       </div>
 
-      <div className="overflow-auto max-h-96">
-        <table className="min-w-full text-xs">
+      <div className="flex-1 overflow-auto min-h-0">
+        <table className="min-w-full text-xs xl:text-sm">
           <thead>
             <tr className="border-b border-gray-200">
-              <th className="text-left py-1 px-2 font-medium text-gray-700 text-xs">Strike</th>
-              <th className="text-center py-1 px-1 font-medium text-gray-700 text-xs">Regime</th>
-              <th className="text-right py-1 px-2 font-medium text-gray-700 text-xs">GEX</th>
-              <th className="text-right py-1 px-2 font-medium text-gray-700 text-xs">DEX</th>
-              <th className="text-right py-1 px-2 font-medium text-gray-700 text-xs">OI</th>
-              <th className="text-left py-1 px-2 font-medium text-gray-700 text-xs">Terrain</th>
+              <th className="text-left py-1 px-2 font-medium text-gray-700 text-xs xl:text-sm">Strike</th>
+              <th className="text-center py-1 px-1 font-medium text-gray-700 text-xs xl:text-sm">Regime</th>
+              <th className="text-right py-1 px-2 font-medium text-gray-700 text-xs xl:text-sm">GEX</th>
+              <th className="text-right py-1 px-2 font-medium text-gray-700 text-xs xl:text-sm">DEX</th>
+              <th className="text-right py-1 px-2 font-medium text-gray-700 text-xs xl:text-sm">OI</th>
+              <th className="text-left py-1 px-2 font-medium text-gray-700 text-xs xl:text-sm">Terrain</th>
             </tr>
           </thead>
           <tbody>
@@ -175,33 +175,33 @@ const TerrainTable: React.FC<TerrainTableProps> = ({
                   }`}
                 >
                   {/* Strike */}
-                  <td className="py-1 px-2 font-medium text-sm">
+                  <td className="py-1 px-2 font-medium text-sm xl:text-base">
                     {strike.strike}
                     {isAtSpot && (
-                      <span className="ml-1 text-xs text-yellow-600">← SPX</span>
+                      <span className="ml-1 text-xs xl:text-sm text-yellow-600">← SPX</span>
                     )}
                   </td>
 
                   {/* Regime Code */}
                   <td className="py-1 px-1 text-center font-mono">
                     <div className="flex gap-0.5 justify-center">
-                      <span className={`px-1 rounded text-xs ${getRegimeColor(strike.regime.g)}`}>
+                      <span className={`px-1 rounded text-xs xl:text-sm ${getRegimeColor(strike.regime.g)}`}>
                         {strike.regime.g}
                       </span>
-                      <span className={`px-1 rounded text-xs ${getRegimeColor(strike.regime.d)}`}>
+                      <span className={`px-1 rounded text-xs xl:text-sm ${getRegimeColor(strike.regime.d)}`}>
                         {strike.regime.d}
                       </span>
-                      <span className={`px-1 rounded text-xs ${getRegimeColor(strike.regime.v)}`}>
+                      <span className={`px-1 rounded text-xs xl:text-sm ${getRegimeColor(strike.regime.v)}`}>
                         {strike.regime.v}
                       </span>
-                      <span className={`px-1 rounded text-xs ${getRegimeColor(strike.regime.c)}`}>
+                      <span className={`px-1 rounded text-xs xl:text-sm ${getRegimeColor(strike.regime.c)}`}>
                         {strike.regime.c}
                       </span>
                     </div>
                   </td>
 
                   {/* GEX */}
-                  <td className={`py-1 px-2 text-right text-sm ${
+                  <td className={`py-1 px-2 text-right text-sm xl:text-base ${
                     strike.gex > 0 ? 'text-green-600' :
                     strike.gex < 0 ? 'text-red-600' : 'text-gray-500'
                   }`}>
@@ -209,7 +209,7 @@ const TerrainTable: React.FC<TerrainTableProps> = ({
                   </td>
 
                   {/* DEX */}
-                  <td className={`py-1 px-2 text-right text-sm ${
+                  <td className={`py-1 px-2 text-right text-sm xl:text-base ${
                     strike.dex > 0 ? 'text-green-600' :
                     strike.dex < 0 ? 'text-red-600' : 'text-gray-500'
                   }`}>
@@ -217,14 +217,14 @@ const TerrainTable: React.FC<TerrainTableProps> = ({
                   </td>
 
                   {/* Open Interest */}
-                  <td className="py-1 px-2 text-right text-gray-600 text-sm">
+                  <td className="py-1 px-2 text-right text-gray-600 text-sm xl:text-base">
                     {formatExposure(strike.call_oi + strike.put_oi)}
                   </td>
 
                   {/* Terrain & Flags */}
                   <td className="py-1 px-2">
-                    <div className="max-w-24">
-                      <div className="text-xs truncate" title={strike.classification}>
+                    <div className="max-w-24 xl:max-w-32">
+                      <div className="text-xs xl:text-sm truncate" title={strike.classification}>
                         {strike.classification.split(' — ')[0]}
                       </div>
                       {strike.pattern_flags.length > 0 && (
@@ -232,7 +232,7 @@ const TerrainTable: React.FC<TerrainTableProps> = ({
                           {strike.pattern_flags.map(flag => (
                             <span
                               key={flag}
-                              className="inline-block px-1 py-0.5 text-xs bg-red-100 text-red-800 rounded"
+                              className="inline-block px-1 py-0.5 text-xs xl:text-sm bg-red-100 text-red-800 rounded"
                             >
                               {flag.replace('MAX_DOWNSIDE_', 'MAX ')}
                             </span>

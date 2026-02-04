@@ -40,10 +40,10 @@ const DTEView: React.FC<DTEViewProps> = ({ activeTab, exposuresData, loading }) 
     <div className="space-y-6">
       {/* Header */}
       <div className="text-center mb-6">
-        <h1 className="text-3xl font-bold text-gray-900 mb-2">
+        <h1 className="text-2xl xl:text-3xl 2xl:text-4xl font-bold text-gray-900 mb-2">
           SPX 0DTE (SPXW) Intraday Analysis
         </h1>
-        <p className="text-gray-600 max-w-2xl mx-auto">
+        <p className="text-sm xl:text-base text-gray-600 max-w-2xl mx-auto">
           Real-time gamma exposure analysis for today's expiration only.
           Focus on GEX amplification, DEX direction, and CEX time drift in the final hours.
         </p>
@@ -93,93 +93,168 @@ const DTEView: React.FC<DTEViewProps> = ({ activeTab, exposuresData, loading }) 
       </div>
 
       {/* Main Analysis Grid */}
-      <div className="grid grid-cols-1 xl:grid-cols-3 gap-6">
-        {/* Heatmap - GEX Focus */}
-        <div className="xl:col-span-2">
-          <div className="card">
-            <div className="mb-4">
-              <h3 className="text-lg font-semibold text-gray-900">GEX Heatmap (SPXW Today Only)</h3>
-              <p className="text-sm text-gray-600">
-                Strike-level gamma exposure for today's expiration.
-                Red = Bearish positioning, Green = Bullish positioning.
-              </p>
-            </div>
-            <Heatmap
-              matrixData={null}
-              exposuresData={exposuresData}
-              metric="GEX"
-              expiration={exposuresData?.expiration || '0DTE'}
-              loading={loading}
-            />
-          </div>
-        </div>
-
-        {/* Side Panel */}
-        <div className="space-y-6">
-          {/* Conductivity Analysis */}
-          <ConductivityCard
-            exposuresData={exposuresData}
-            loading={loading}
-            instrument="SPX"
-          />
-
-          {/* SPX Spot (Calculation Anchor - Roberto requirement) */}
-          {exposuresData && (
+      <div className="xl:space-y-6">
+        {/* Main Grid for Chart and Sidebar */}
+        <div className="grid grid-cols-1 xl:grid-cols-3 gap-6 xl:gap-8 xl:h-[calc(100vh-200px)]">
+          {/* Heatmap - GEX Focus */}
+          <div className="xl:col-span-2">
             <div className="card">
-              <div className="text-sm font-medium text-gray-700 mb-2">SPX Spot (Used for Calculations)</div>
-              <div className="text-lg font-semibold text-gray-900">
-                {exposuresData.spot?.toFixed(2)}
+              <div className="mb-4">
+                <h3 className="text-lg font-semibold text-gray-900">GEX Heatmap (SPXW Today Only)</h3>
+                <p className="text-sm text-gray-600">
+                  Strike-level gamma exposure for today's expiration.
+                  Red = Bearish positioning, Green = Bullish positioning.
+                </p>
               </div>
-              <div className="text-xs text-gray-600 mt-1">
-                Single source of truth for all GEX/DEX/VEX/CEX calculations
-              </div>
+              <Heatmap
+                matrixData={null}
+                exposuresData={exposuresData}
+                metric="GEX"
+                expiration={exposuresData?.expiration || '0DTE'}
+                loading={loading}
+              />
             </div>
-          )}
+          </div>
 
-          {/* SPXW Diagnostic (shows SPXW quote for comparison) */}
-          {spxwQuote && (
-            <div className="card bg-gray-50 border-gray-300">
-              <div className="text-sm font-medium text-gray-700 mb-2">SPXW Quote (Diagnostic)</div>
-              <div className="text-lg font-semibold text-gray-900">
-                {spxwQuote.last?.toFixed(2)}
+          {/* Side Panel */}
+          <div className="xl:col-span-1">
+            {/* For smaller screens: No scrolling, include terrain table */}
+            <div className="xl:hidden space-y-4">
+
+            {/* Conductivity Analysis */}
+            <ConductivityCard
+              exposuresData={exposuresData}
+              loading={loading}
+              instrument="SPX"
+            />
+
+            {/* SPX Spot (Calculation Anchor - Roberto requirement) */}
+            {exposuresData && (
+              <div className="card">
+                <div className="text-sm font-medium text-gray-700 mb-2">SPX Spot (Used for Calculations)</div>
+                <div className="text-lg font-semibold text-gray-900">
+                  {exposuresData.spot?.toFixed(2)}
+                </div>
+                <div className="text-xs text-gray-600 mt-1">
+                  Single source of truth for all GEX/DEX/VEX/CEX calculations
+                </div>
               </div>
-              <div className="text-xs text-gray-600 mt-1">
-                SPXW is "S&P Weeklys dummy underlying" - used for weekly options
+            )}
+
+            {/* SPXW Diagnostic (shows SPXW quote for comparison) */}
+            {spxwQuote && (
+              <div className="card bg-gray-50 border-gray-300">
+                <div className="text-sm font-medium text-gray-700 mb-2">SPXW Quote (Diagnostic)</div>
+                <div className="text-lg font-semibold text-gray-900">
+                  {spxwQuote.last?.toFixed(2)}
+                </div>
+                <div className="text-xs text-gray-600 mt-1">
+                  SPXW is "S&P Weeklys dummy underlying" - used for weekly options
+                  {exposuresData && (
+                    <span className="block mt-1">
+                      Delta: {(exposuresData.spot - spxwQuote.last)?.toFixed(2)} points
+                    </span>
+                  )}
+                </div>
+              </div>
+            )}
+
+            {/* Market Alerts - Dynamic based on regime */}
+            <Legend exposuresData={exposuresData} />
+
+            {/* 0DTE Trading Notes */}
+            <div className="card bg-blue-50 border-blue-200">
+              <h4 className="text-md font-semibold text-blue-900 mb-2">0DTE Trading Notes</h4>
+              <ul className="text-sm text-blue-800 space-y-1">
+                <li>• GEX negative = momentum amplification in either direction</li>
+                <li>• CEX becomes critical in final 2 hours</li>
+                <li>• High OI strikes act as magnets</li>
+                <li>• SPXW moves 2-3x faster than SPX</li>
+                <li>• Time decay accelerates exponentially</li>
+              </ul>
+            </div>
+
+            {/* Terrain Table for smaller screens */}
+            <div className="card">
+              <h3 className="text-lg font-semibold text-gray-900 mb-4">0DTE Strike Terrain</h3>
+              <p className="text-sm text-gray-600 mb-4">
+                Key strikes within ±400 points of SPX spot. Focus on high OI strikes near ATM.
+              </p>
+              <TerrainTable
+                exposuresData={exposuresData}
+                loading={loading}
+                mode="0DTE"
+              />
+            </div>
+            </div>
+
+            {/* For XL screens: Scrollable, no terrain table in sidebar */}
+            <div className="hidden xl:block h-full">
+              <div className="overflow-y-auto h-full space-y-6 max-h-[calc(100vh-160px)]">
+                {/* Conductivity Analysis */}
+                <ConductivityCard
+                  exposuresData={exposuresData}
+                  loading={loading}
+                  instrument="SPX"
+                />
+
+                {/* SPX Spot (Calculation Anchor - Roberto requirement) */}
                 {exposuresData && (
-                  <span className="block mt-1">
-                    Delta: {(exposuresData.spot - spxwQuote.last)?.toFixed(2)} points
-                  </span>
+                  <div className="card">
+                    <div className="text-sm font-medium text-gray-700 mb-2">SPX Spot (Used for Calculations)</div>
+                    <div className="text-lg font-semibold text-gray-900">
+                      {exposuresData.spot?.toFixed(2)}
+                    </div>
+                    <div className="text-xs text-gray-600 mt-1">
+                      Single source of truth for all GEX/DEX/VEX/CEX calculations
+                    </div>
+                  </div>
+                )}
+
+                {/* SPXW Diagnostic (shows SPXW quote for comparison) */}
+                {spxwQuote && (
+                  <div className="card bg-gray-50 border-gray-300">
+                    <div className="text-sm font-medium text-gray-700 mb-2">SPXW Quote (Diagnostic)</div>
+                    <div className="text-lg font-semibold text-gray-900">
+                      {spxwQuote.last?.toFixed(2)}
+                    </div>
+                    <div className="text-xs text-gray-600 mt-1">
+                      SPXW is "S&P Weeklys dummy underlying" - used for weekly options
+                      {exposuresData && (
+                        <span className="block mt-1">
+                          Delta: {(exposuresData.spot - spxwQuote.last)?.toFixed(2)} points
+                        </span>
+                      )}
+                    </div>
+                  </div>
                 )}
               </div>
             </div>
-          )}
+          </div>
+        </div>
 
-          {/* Market Alerts - Dynamic based on regime */}
-          <Legend exposuresData={exposuresData} />
+        {/* Spacing for XL screens */}
+        <div className="hidden xl:block xl:h-8 2xl:h-12"></div>
 
-          {/* 0DTE-Specific Terrain */}
+        {/* Market Alerts - Below main grid, above terrain table (XL only) */}
+        <div className="hidden xl:block">
+          <div className="xl:mt-8 2xl:mt-10">
+            <Legend exposuresData={exposuresData} />
+          </div>
+        </div>
+
+        {/* Full-width Terrain Table (XL and above) */}
+        <div className="hidden xl:block">
           <div className="card">
-            <h3 className="text-lg font-semibold text-gray-900 mb-4">0DTE Strike Terrain</h3>
-            <p className="text-sm text-gray-600 mb-4">
-              Key strikes within ±400 points of SPX spot. Focus on high OI strikes near ATM.
+            <h3 className="text-lg xl:text-xl 2xl:text-2xl font-semibold text-gray-900 mb-4">0DTE Strike Terrain</h3>
+            <p className="text-sm xl:text-base text-gray-600 mb-4">
+              Focus on high OI strikes near ATM for optimal 0DTE positioning
             </p>
             <TerrainTable
               exposuresData={exposuresData}
               loading={loading}
               mode="0DTE"
             />
-          </div>
-
-          {/* 0DTE Trading Notes */}
-          <div className="card bg-blue-50 border-blue-200">
-            <h4 className="text-md font-semibold text-blue-900 mb-2">0DTE Trading Notes</h4>
-            <ul className="text-sm text-blue-800 space-y-1">
-              <li>• GEX negative = momentum amplification in either direction</li>
-              <li>• CEX becomes critical in final 2 hours</li>
-              <li>• High OI strikes act as magnets</li>
-              <li>• SPXW moves 2-3x faster than SPX</li>
-              <li>• Time decay accelerates exponentially</li>
-            </ul>
           </div>
         </div>
       </div>

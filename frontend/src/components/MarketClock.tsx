@@ -116,33 +116,72 @@ const MarketClock: React.FC = () => {
     }
   };
 
-  const nextTradingDay = useMemo(() => {
+  const [nextTradingDay, today] = useMemo((): [{ date: string; status: string; description: string } | null, string] => {
     if (!calendarData?.calendar?.days?.day || !Array.isArray(calendarData.calendar.days.day)) {
-      return null;
+      return [null, ''];
     }
 
-    const today = new Date().toISOString().split('T')[0]; // YYYY-MM-DD format
+    // Use UTC date for consistency with calendar/trading data
+    const now = new Date();
+    const utcISOString = now.toISOString();
+    const currentDate = utcISOString.split('T')[0]; // UTC YYYY-MM-DD
+    const localDate = now.toLocaleDateString();
+    console.log('🗓️ MarketClock Debug:');
+    console.log('  - Local time:', now.toLocaleString());
+    console.log('  - UTC ISO:', utcISOString);
+    console.log('  - Today (UTC):', currentDate);
+    console.log('  - Local date:', localDate);
+    console.log('📅 MarketClock: Calendar has', calendarData.calendar.days.day.length, 'days');
 
     try {
-      // Find next trading day (open or early_close status)
+      // Find next trading day (open or early_close status) - skip today
       for (const day of calendarData.calendar.days.day) {
         if (day && typeof day === 'object' && day.date && day.status) {
-          if (day.date > today && (day.status === 'open' || day.status === 'early_close')) {
-            // Always skip today - we want the NEXT trading day
-            return {
+          console.log(`📊 MarketClock: Checking ${day.date} (${day.status}) - Today: ${currentDate}, Compare: ${day.date !== currentDate && day.date > currentDate}`);
+          // Strict check: must be AFTER today AND not equal to today AND be a trading day
+          if (day.date !== currentDate && day.date > currentDate &&
+              (day.status === 'open' || day.status === 'early_close')) {
+            console.log('✅ MarketClock: Found next trading day:', day.date, '(today:', currentDate, ')');
+            // Double-check that we're not returning today
+            if (day.date <= currentDate) {
+              console.log('❌ MarketClock: ERROR - Returned date is not after today!');
+              continue;
+            }
+            return [{
               date: day.date,
               status: day.status,
               description: day.description || 'Trading day'
-            };
+            }, currentDate];
           }
         }
       }
+      console.log('❌ MarketClock: No next trading day found in calendar data');
     } catch (error) {
       console.warn('Error processing calendar data:', error);
-      return null;
+      return [null, currentDate];
     }
 
-    return null;
+    // If no next trading day found in calendar, assume next weekday (simple fallback)
+    if (!nextTradingDay) {
+      const tomorrow = new Date(now);
+      tomorrow.setDate(tomorrow.getDate() + 1);
+
+      // Simple weekday check (0=Sunday, 6=Saturday)
+      while (tomorrow.getDay() === 0 || tomorrow.getDay() === 6) {
+        tomorrow.setDate(tomorrow.getDate() + 1);
+      }
+
+      const nextWeekday = tomorrow.toISOString().split('T')[0];
+      console.log('🔄 MarketClock: No calendar data, assuming next weekday:', nextWeekday);
+
+      return [{
+        date: nextWeekday,
+        status: 'open',
+        description: 'Assumed trading day (calendar unavailable)'
+      }, currentDate];
+    }
+
+    return [nextTradingDay, currentDate];
   }, [calendarData]);
 
   if (loading) {
@@ -187,8 +226,14 @@ const MarketClock: React.FC = () => {
 
       {/* Date and Time */}
       <div className="text-xs text-gray-600">
-        <div>Date: {new Date(clock.date).toLocaleDateString()}</div>
-        <div>Time: {formatTime(currentTime.toISOString())}</div>
+        <div>Date: {(() => {
+          const now = new Date();
+          const utcDate = now.toISOString().split('T')[0];
+          const [year, month, day] = utcDate.split('-');
+          return `${month}/${day}/${year}`;
+        })()}</div>
+        <div>Market Time: {formatTime(new Date().toLocaleString('en-US', {timeZone: 'America/New_York'}))}</div>
+        <div className="text-gray-500">Your Local: {formatTime(currentTime.toISOString())}</div>
         <div className="text-gray-500">Last updated: {formatTime(clock.timestamp)}</div>
       </div>
 
@@ -204,9 +249,12 @@ const MarketClock: React.FC = () => {
               {clock.next_change && clock.next_state && (
                 <div>Next: {clock.next_change} ({clock.next_state})</div>
               )}
-              {nextTradingDay && nextTradingDay.date !== clock.date && (
+              {nextTradingDay && nextTradingDay.date !== today && (
                 <div className="text-blue-600">
-                  Next Trading Day: {new Date(nextTradingDay.date).toLocaleDateString()}
+                  Next Trading Day: {(() => {
+                    const [year, month, day] = nextTradingDay.date.split('-');
+                    return `${month}/${day}/${year}`;
+                  })()}
                   {nextTradingDay.status === 'early_close' && ' (Early Close)'}
                 </div>
               )}

@@ -318,16 +318,16 @@ class TradierClient:
                     "change_percentage": round(random.uniform(-20, 20), 2) if random.random() > 0.5 else None,
                     "average_volume": random.randint(0, 5000),
                     "last_volume": random.randint(0, 500),
-                    "trade_date": int(datetime.now().timestamp() * 1000),
+                    "trade_date": int(datetime.now().timestamp()),  # Unix timestamp in seconds
                     "prevclose": round(random.uniform(strike * 0.01, strike * 0.05), 2) if random.random() > 0.7 else None,
                     "week_52_high": round(strike * 1.1, 2),
                     "week_52_low": round(strike * 0.9, 2),
                     "bidsize": random.randint(1, 50),
                     "bidexch": "C",
-                    "bid_date": int(datetime.now().timestamp() * 1000),
+                    "bid_date": int(datetime.now().timestamp()),  # Unix timestamp in seconds
                     "asksize": random.randint(1, 50),
                     "askexch": "C",
-                    "ask_date": int(datetime.now().timestamp() * 1000),
+                    "ask_date": int(datetime.now().timestamp()),  # Unix timestamp in seconds
                     "open_interest": random.randint(0, 10000),
                     "contract_size": 100,
                     "expiration_date": expiration,

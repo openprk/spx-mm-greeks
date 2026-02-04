@@ -68,11 +68,14 @@ function App() {
         console.log('📦 Expirations data:', expData);
         setExpirations(expData.expirations);
 
-        // Set first available expiration if we don't have one set
-        // Skip today's date as it might not have options data yet
-        if (expData.expirations && expData.expirations.length > 0) {
-          const today = new Date().toISOString().split('T')[0]; // YYYY-MM-DD format
-          let firstExpiration = expData.expirations[0];
+          // Set first available expiration if we don't have one set
+          // Skip today's date as it might not have options data yet
+          if (expData.expirations && expData.expirations.length > 0) {
+            // Use US/Eastern timezone for trading dates (Roberto is in US)
+            const today = new Date().toLocaleDateString('en-CA', {
+              timeZone: 'America/New_York'
+            }); // YYYY-MM-DD format in US/Eastern
+            let firstExpiration = expData.expirations[0];
 
           // If first expiration is today, skip to next available
           if (firstExpiration === today && expData.expirations.length > 1) {
@@ -121,7 +124,10 @@ function App() {
     } else if (activeTab === '0dte') {
       // 0DTE tab polling - use today's date for single expiration (not ALL)
       // 0DTE should refresh at 1s intervals as per specification
-      const today = new Date().toISOString().split('T')[0]; // YYYY-MM-DD format
+      // Use US/Eastern timezone for trading dates (Roberto is in US)
+      const today = new Date().toLocaleDateString('en-CA', {
+        timeZone: 'America/New_York'
+      }); // YYYY-MM-DD format in US/Eastern
       const pollingParams = `0DTE-${metric}-AUTO-1000`; // 1 second refresh for 0DTE
       if (pollingParams !== lastPollingParamsRef.current) {
         lastPollingParamsRef.current = pollingParams;

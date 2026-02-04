@@ -19,9 +19,22 @@ const TerrainTable: React.FC<TerrainTableProps> = ({
     if (!exposuresData) return [];
 
     const spot = exposuresData.spot;
+
+    // Get all strikes within range
     const nearbyStrikes = exposuresData.strikes
-      .filter(strike => Math.abs(strike.strike - spot) <= strikeRange)
-      .sort((a, b) => Math.abs(a.strike - spot) - Math.abs(b.strike - spot));
+      .filter(strike => Math.abs(strike.strike - spot) <= strikeRange);
+
+    // Separate strikes into below and above spot
+    const belowSpot = nearbyStrikes
+      .filter(strike => strike.strike < spot)
+      .sort((a, b) => b.strike - a.strike); // Descending: higher strikes first
+
+    const aboveSpot = nearbyStrikes
+      .filter(strike => strike.strike > spot)
+      .sort((a, b) => a.strike - b.strike); // Ascending: lower strikes first
+
+    const atSpot = nearbyStrikes
+      .filter(strike => Math.abs(strike.strike - spot) < 5); // Strikes at spot level
 
     // Also include strikes with pattern flags (even if outside range)
     const flaggedStrikes = exposuresData.strikes
@@ -49,13 +62,20 @@ const TerrainTable: React.FC<TerrainTableProps> = ({
       .slice(0, 10)
       .map(item => item.strike);
 
-    // For 0DTE mode, enforce the range limit on ALL strikes (including flagged and walls)
-    const allStrikesFiltered = [...nearbyStrikes, ...flaggedStrikes, ...topWalls]
+    // Build final terrain with spot-centered ordering
+    const additionalStrikes = [...flaggedStrikes, ...topWalls]
       .filter(strike => mode !== '0DTE' || Math.abs(strike.strike - spot) <= strikeRange)
       .sort((a, b) => Math.abs(a.strike - spot) - Math.abs(b.strike - spot));
 
-    // Show all relevant strikes (no artificial limit)
-    return allStrikesFiltered;
+    // Final ordering: above spot (descending) + at spot + below spot (ascending) + additional strikes
+    // Deduplicate by strike price to avoid React key conflicts
+    const allStrikes = [...aboveSpot, ...atSpot, ...belowSpot, ...additionalStrikes];
+    const seen = new Set();
+    return allStrikes.filter(strike => {
+      if (seen.has(strike.strike)) return false;
+      seen.add(strike.strike);
+      return true;
+    });
   }, [exposuresData, mode]);
 
   const formatExposure = (value: number) => {

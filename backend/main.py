@@ -373,8 +373,17 @@ async def get_exposures(
 
     # Handle 0DTE mode - TODAY ONLY (no fallbacks to other dates)
     if mode == "0DTE":
-        today_date = date.today().isoformat()
-        print(f"🔥 0DTE mode: Attempting to use TODAY'S expiration only: {today_date}")
+        # Use US/Eastern timezone for trading dates (Roberto is in US)
+        try:
+            import pytz
+            eastern = pytz.timezone('US/Eastern')
+            today_eastern = datetime.now(eastern).date()
+            today_date = today_eastern.isoformat()
+        except ImportError:
+            # Fallback if pytz not available - use date.today() but warn
+            today_date = date.today().isoformat()
+            print(f"⚠️ pytz not available, using server local date: {today_date}")
+        print(f"🔥 0DTE mode: Attempting to use TODAY'S expiration only: {today_date} (US/Eastern timezone)")
 
         # For 0DTE validation, use a reasonable SPX spot estimate to avoid filtering issues
         spot_estimate = 6900  # Conservative estimate for validation
@@ -451,9 +460,17 @@ async def get_exposures(
 
                 # Exclude today's expiration from ALL mode when not in 0DTE to avoid duplication
                 if mode != "0DTE":
-                    today = date.today().isoformat()
-                    all_expirations = [exp for exp in all_expirations if exp != today]
-                    print(f"🔄 Structure mode: Excluded today's expiration ({today}) from ALL aggregation")
+                    # Use US/Eastern timezone for trading dates
+                    try:
+                        import pytz
+                        eastern = pytz.timezone('US/Eastern')
+                        today_eastern = datetime.now(eastern).date().isoformat()
+                        all_expirations = [exp for exp in all_expirations if exp != today_eastern]
+                        print(f"🔄 Structure mode: Excluded today's expiration ({today_eastern}) from ALL aggregation (US/Eastern timezone)")
+                    except ImportError:
+                        today = date.today().isoformat()
+                        all_expirations = [exp for exp in all_expirations if exp != today]
+                        print(f"🔄 Structure mode: Excluded today's expiration ({today}) from ALL aggregation (server local time)")
 
                 # Aggregate data across all expirations
                 all_strike_data = {}
@@ -662,9 +679,17 @@ async def get_exposures_matrix(
 
         # Exclude today's expiration from matrix when not in 0DTE to avoid duplication
         if mode != "0DTE":
-            today = date.today().isoformat()
-            all_expirations = [exp for exp in all_expirations if exp != today]
-            print(f"🔄 Matrix mode: Excluded today's expiration ({today}) from analysis")
+            # Use US/Eastern timezone for trading dates
+            try:
+                import pytz
+                eastern = pytz.timezone('US/Eastern')
+                today_eastern = datetime.now(eastern).date().isoformat()
+                all_expirations = [exp for exp in all_expirations if exp != today_eastern]
+                print(f"🔄 Matrix mode: Excluded today's expiration ({today_eastern}) from analysis (US/Eastern timezone)")
+            except ImportError:
+                today = date.today().isoformat()
+                all_expirations = [exp for exp in all_expirations if exp != today]
+                print(f"🔄 Matrix mode: Excluded today's expiration ({today}) from analysis (server local time)")
 
         all_expirations = all_expirations[:8]  # Limit to 8 expirations for performance
 

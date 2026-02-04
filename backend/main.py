@@ -568,6 +568,18 @@ async def get_exposures(
             )
             strikes_data.append(strike_data)
 
+        # Set pattern flags only for the 1-2 strikes closest to spot price (Roberto requirement)
+        # This makes alerts very specific to where price is currently located
+        if len(strikes_data) > 0:
+            # Find the 2 closest strikes to spot price
+            closest_strikes = sorted(strikes_data, key=lambda s: abs(s.strike - spot_price))[:2]
+
+            # Only set MAX_DOWNSIDE_ACCELERATION for closest strikes that have dangerous regime
+            for strike_data in closest_strikes:
+                if strike_data.regime_code == "G- D- V- C+":
+                    if not strike_data.pattern_flags:  # Don't duplicate if already set
+                        strike_data.pattern_flags.append("MAX_DOWNSIDE_ACCELERATION")
+
         # Calculate aggregate data from strike_aggregations
         if len(strikes_data) > 0:
             aggregate_exposures = aggregate_all_expirations(strike_aggregations)

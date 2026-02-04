@@ -213,11 +213,8 @@ def classify_strike_terrain(
     pattern_flags = []
 
     # Guide-compliant strike-level alerts (only the specified one)
-    # Only trigger pattern alerts for strikes near spot price (Roberto requirement)
-    if regime_code == "G- D- V- C+":
-        distance_from_spot = abs(strike - spot_price) / spot_price
-        if distance_from_spot < 0.02:  # Within 2% of spot price
-            pattern_flags.append("MAX_DOWNSIDE_ACCELERATION")
+    # Pattern flags will be set later in main.py only for strikes closest to spot
+    # This ensures alerts only trigger for where price is currently located
 
     # Terrain mapping based on regime codes
     # Note: Guide specifies normalization of duplicates to one canonical mapping

@@ -580,9 +580,13 @@ async def get_exposures(
             conductivity, notes = determine_conductivity(agg_regime, vix_regime_used)
 
             # Generate dynamic market alerts based on aggregate conditions
+            # Find strikes closest to spot price for proximity alerts (not just top strikes)
+            strikes_sorted_by_distance = sorted(strikes_data, key=lambda s: abs(s.strike - spot_price))
+            closest_strikes = [s.strike for s in strikes_sorted_by_distance[:8]]  # 8 closest strikes to spot
+
             market_alerts = determine_market_alerts(
                 agg_regime, agg_regime_code, vix_regime_used, spot_price,
-                [strike_data.strike for strike_data in strikes_data[:10]],  # Top 10 strikes for proximity alerts
+                closest_strikes,  # Strikes closest to spot for proximity alerts
                 mode  # Pass mode for 0DTE-specific alerts
             )
 

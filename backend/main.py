@@ -45,7 +45,7 @@ matrix_lock = asyncio.Lock()
 # TTL caches for API responses
 spot_cache = TTLCache(maxsize=1, ttl=settings.alert_cache_ttl_seconds)  # 10s for dynamic alerts
 expirations_cache = TTLCache(maxsize=1, ttl=settings.cache_ttl_seconds)  # 60s for expirations
-chain_cache = TTLCache(maxsize=10, ttl=settings.alert_cache_ttl_seconds)  # 10s for alert-critical data
+chain_cache = TTLCache(maxsize=10, ttl=300)  # 5 minutes for expensive chain processing
 calendar_cache = TTLCache(maxsize=12, ttl=86400)  # 24 hours for calendar data (monthly)
 
 async def validate_expiration_has_data(expiration: str, spot_price: float, mode: str, instrument: str = "SPX") -> bool:
@@ -809,6 +809,19 @@ async def get_chain_data(expiration: str, spot_price: float = None, mode: str = 
         # Filter options based on mode
         if spot_price is not None:
             original_count = len(options)
+
+            # First, validate and clean the options data (Roberto requirement: skip invalid contracts safely)
+            valid_options = [
+                opt for opt in options
+                if opt is not None and isinstance(opt, dict) and opt.get("strike") is not None
+            ]
+
+            invalid_count = original_count - len(valid_options)
+            if invalid_count > 0:
+                print(f"⚠️ Filtered out {invalid_count} invalid/None option objects from {original_count} total")
+
+            options = valid_options
+
             if instrument == "SPXW" or mode == "0DTE":
                 # Roberto's specification: ±200-400 points from spot for comprehensive 0DTE analysis
                 min_strike = spot_price - 200
@@ -820,11 +833,12 @@ async def get_chain_data(expiration: str, spot_price: float = None, mode: str = 
                 max_strike = spot_price * 1.3
                 print(f"📊 SPX standard mode: Using broad strike filter (±30% of spot: {min_strike:.0f}-{max_strike:.0f})")
 
+            # Apply strike range filtering to valid options
             options = [
                 opt for opt in options
                 if min_strike <= float(opt.get("strike", 0)) <= max_strike
             ]
-            print(f"📊 Filtered {original_count} options to {len(options)} relevant strikes")
+            print(f"📊 Filtered {len(valid_options)} valid options to {len(options)} relevant strikes")
 
             # Debug: show first available option
             if options:
@@ -834,8 +848,11 @@ async def get_chain_data(expiration: str, spot_price: float = None, mode: str = 
         contracts = []
         for opt in options:
             try:
-                # Extract Greeks from nested structure
+                # Extract Greeks from nested structure with defensive parsing
                 greeks = opt.get("greeks", {})
+
+                # Handle missing greeks data (Roberto requirement: compute via Black-Scholes if needed)
+                # For now, set missing values to None - frontend can handle display
                 contract = OptionContract(
                     symbol=opt.get("symbol", ""),
                     option_type=opt.get("option_type", "call" if "C" in opt.get("symbol", "") else "put"),

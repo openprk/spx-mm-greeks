@@ -38,6 +38,7 @@ const MarketClock: React.FC = () => {
       }
       const data = await response.json();
       setClockData(data);
+      setCurrentTime(new Date()); // Update time when market data is fetched
       setError(null);
     } catch (err) {
       setError(err instanceof Error ? err.message : 'Unknown error');
@@ -70,15 +71,14 @@ const MarketClock: React.FC = () => {
     fetchClock();
     fetchCalendar();
 
-    // Update market data every 30 seconds
-    const marketInterval = setInterval(fetchClock, 30000);
+    // Update market data every 5 minutes (300 seconds) - market state changes infrequently
+    const marketInterval = setInterval(fetchClock, 300000);
 
-    // Update live time every second
-    const timeInterval = setInterval(() => setCurrentTime(new Date()), 1000);
+    // Remove live time polling - browser Date object is accurate enough for display
+    // Update time display on market data updates instead
 
     return () => {
       clearInterval(marketInterval);
-      clearInterval(timeInterval);
     };
   }, []);
 

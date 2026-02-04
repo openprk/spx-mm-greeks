@@ -1,4 +1,4 @@
-import { useState, useEffect, useRef } from 'react';
+import { useState, useEffect } from 'react';
 import StructuralView from './components/StructuralView';
 import DTEView from './components/0DTEView';
 import MarketClock from './components/MarketClock';
@@ -22,8 +22,6 @@ function App() {
   const [loading, setLoading] = useState<boolean>(true);
   const [error, setError] = useState<string | null>(null);
 
-  // Prevent duplicate polling starts
-  const lastPollingParamsRef = useRef<string>('');
 
   // Initialize polling hook
   const { startPolling, stopPolling } = useApiPolling({
@@ -113,13 +111,9 @@ function App() {
     stopPolling();
 
     if (activeTab === 'structural') {
-      // Structure tab polling
+      // Structure tab polling - restart whenever relevant params change
       if (expirations.length > 0 && expiration) {
-        const pollingParams = `${expiration}-${metric}-${vixRegime}-${refreshInterval}`;
-        if (pollingParams !== lastPollingParamsRef.current) {
-          lastPollingParamsRef.current = pollingParams;
-          startPolling(expiration, metric, vixRegime, 'ALL');
-        }
+        startPolling(expiration, metric, vixRegime, 'ALL', refreshInterval);
       }
     } else if (activeTab === '0dte') {
       // 0DTE tab polling - use today's date for single expiration (not ALL)
@@ -128,13 +122,9 @@ function App() {
       const today = new Date().toLocaleDateString('en-CA', {
         timeZone: 'America/New_York'
       }); // YYYY-MM-DD format in US/Eastern
-      const pollingParams = `0DTE-${metric}-AUTO-1000`; // 1 second refresh for 0DTE
-      if (pollingParams !== lastPollingParamsRef.current) {
-        lastPollingParamsRef.current = pollingParams;
-        startPolling(today, metric, 'AUTO', '0DTE', 1000); // 1 second refresh
-      }
+      startPolling(today, metric, 'AUTO', '0DTE', 1000); // 1 second refresh
     }
-  }, [activeTab, expiration, metric, vixRegime, refreshInterval, expirations.length, startPolling, stopPolling]);
+  }, [activeTab, expiration, metric, vixRegime, refreshInterval, expirations.length]);
 
   // Reset data when switching tabs to prevent stale data
   useEffect(() => {

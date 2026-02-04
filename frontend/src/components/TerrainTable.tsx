@@ -24,18 +24,6 @@ const TerrainTable: React.FC<TerrainTableProps> = ({
     const nearbyStrikes = exposuresData.strikes
       .filter(strike => Math.abs(strike.strike - spot) <= strikeRange);
 
-    // Separate strikes into below and above spot
-    const belowSpot = nearbyStrikes
-      .filter(strike => strike.strike < spot)
-      .sort((a, b) => b.strike - a.strike); // Descending: higher strikes first
-
-    const aboveSpot = nearbyStrikes
-      .filter(strike => strike.strike > spot)
-      .sort((a, b) => a.strike - b.strike); // Ascending: lower strikes first
-
-    const atSpot = nearbyStrikes
-      .filter(strike => Math.abs(strike.strike - spot) < 5); // Strikes at spot level
-
     // Also include strikes with pattern flags (even if outside range)
     const flaggedStrikes = exposuresData.strikes
       .filter(strike => strike.pattern_flags.length > 0)
@@ -62,16 +50,16 @@ const TerrainTable: React.FC<TerrainTableProps> = ({
       .slice(0, 10)
       .map(item => item.strike);
 
-    // Build final terrain with spot-centered ordering
-    const additionalStrikes = [...flaggedStrikes, ...topWalls]
-      .filter(strike => mode !== '0DTE' || Math.abs(strike.strike - spot) <= strikeRange)
-      .sort((a, b) => Math.abs(a.strike - spot) - Math.abs(b.strike - spot));
+    // Build final terrain: all nearby strikes + additional strikes, sorted by strike descending
+    const allStrikes = [...nearbyStrikes, ...flaggedStrikes, ...topWalls]
+      .filter(strike => mode !== '0DTE' || Math.abs(strike.strike - spot) <= strikeRange);
 
-    // Final ordering: above spot (descending) + at spot + below spot (ascending) + additional strikes
+    // Sort by strike price descending (highest to lowest) - spot will be in the middle
+    const sortedStrikes = allStrikes.sort((a, b) => b.strike - a.strike);
+
     // Deduplicate by strike price to avoid React key conflicts
-    const allStrikes = [...aboveSpot, ...atSpot, ...belowSpot, ...additionalStrikes];
     const seen = new Set();
-    return allStrikes.filter(strike => {
+    return sortedStrikes.filter(strike => {
       if (seen.has(strike.strike)) return false;
       seen.add(strike.strike);
       return true;

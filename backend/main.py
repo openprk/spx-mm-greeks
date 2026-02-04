@@ -568,14 +568,20 @@ async def get_exposures(
             )
             strikes_data.append(strike_data)
 
-        # Set pattern flags only for the 1-2 strikes closest to spot price (Roberto requirement)
-        # This makes alerts very specific to where price is currently located
+        # Define spot strikes exactly using floor/ceil by increment (Roberto requirement #1)
+        # For SPX with 5-point strikes: lower = floor(spot / 5) * 5, upper = lower + 5
         if len(strikes_data) > 0:
-            # Find the 2 closest strikes to spot price
-            closest_strikes = sorted(strikes_data, key=lambda s: abs(s.strike - spot_price))[:2]
+            strike_increment = 5  # SPX strike increment
+            lower_strike = (spot_price // strike_increment) * strike_increment
+            upper_strike = lower_strike + strike_increment
+            spot_strikes_values = [lower_strike, upper_strike]
 
-            # Only set MAX_DOWNSIDE_ACCELERATION for closest strikes that have dangerous regime
-            for strike_data in closest_strikes:
+            # Find the actual strike data objects for spot strikes
+            spot_strikes_data = [s for s in strikes_data if s.strike in spot_strikes_values]
+
+            # Pattern alerts must be rare and ONLY on the spot strikes (Roberto requirement #2)
+            # Only evaluate MAX_DOWNSIDE_ACCELERATION for spot strikes, nothing else
+            for strike_data in spot_strikes_data:
                 if strike_data.regime_code == "G- D- V- C+":
                     if not strike_data.pattern_flags:  # Don't duplicate if already set
                         strike_data.pattern_flags.append("MAX_DOWNSIDE_ACCELERATION")
@@ -593,12 +599,14 @@ async def get_exposures(
 
             # Generate dynamic market alerts based on aggregate conditions
             # Find strikes closest to spot price for proximity alerts (not just top strikes)
-            strikes_sorted_by_distance = sorted(strikes_data, key=lambda s: abs(s.strike - spot_price))
-            closest_strikes = [s.strike for s in strikes_sorted_by_distance[:8]]  # 8 closest strikes to spot
+            # Proximity alerts: distance-based threshold, not count-based (Roberto requirement #3)
+            # Within ±15 points or ±0.25%, whichever is smaller
+            distance_threshold = min(15, spot_price * 0.0025)  # ±15 points or ±0.25%
+            proximity_strikes = [s.strike for s in strikes_data if abs(s.strike - spot_price) <= distance_threshold]
 
             market_alerts = determine_market_alerts(
                 agg_regime, agg_regime_code, vix_regime_used, spot_price,
-                closest_strikes,  # Strikes closest to spot for proximity alerts
+                proximity_strikes,  # Strikes closest to spot for proximity alerts
                 mode  # Pass mode for 0DTE-specific alerts
             )
 

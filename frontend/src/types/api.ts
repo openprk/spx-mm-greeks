@@ -13,6 +13,8 @@ export interface SpotResponse {
   ask: number;
   volume: number;
   timestamp: string;
+  trade_date?: number;
+  is_fallback?: boolean;
 }
 
 export interface ExpirationsResponse {

@@ -28,7 +28,8 @@ class TradierClient:
                     "ask": quote.get("ask") or 0,  # Handle None values
                     "volume": quote.get("volume") or 0,
                     "timestamp": str(quote.get("trade_date") or ""),  # Ensure string
-                    "trade_date": quote.get("trade_date") or 0  # Raw trade_date for data integrity checks
+                    "trade_date": quote.get("trade_date") or 0,  # Raw trade_date for data integrity checks
+                    "is_fallback": False  # SPX is always real data
                 }
             else:
                 raise ValueError("Invalid SPX quote response from Tradier")
@@ -54,11 +55,23 @@ class TradierClient:
                         "volume": quote.get("volume") or 0,
                         "timestamp": str(quote.get("trade_date") or ""),
                         "trade_date": quote.get("trade_date") or 0,  # Raw trade_date for data integrity checks
+                        "is_fallback": False  # Real SPXW data
                     }
                 else:
                     # Fallback to SPX quote if SPXW not available
                     print("🔥 SPXW quote not available, falling back to SPX")
-                    return await self.get_spx_quote()
+                    spx_data = await self.get_spx_quote()
+                    # Return SPX data but mark as fallback
+                    return {
+                        "symbol": "SPXW",  # Keep SPXW label but indicate fallback
+                        "last": spx_data["last"],
+                        "bid": spx_data.get("bid") or 0,
+                        "ask": spx_data.get("ask") or 0,
+                        "volume": spx_data.get("volume") or 0,
+                        "timestamp": spx_data.get("timestamp") or "",
+                        "trade_date": spx_data.get("trade_date") or 0,
+                        "is_fallback": True  # Indicates this is SPX data used as fallback
+                    }
         except Exception as e:
             print(f"🔥 SPXW quote API error: {e}, falling back to SPX")
             return await self.get_spx_quote()

@@ -143,17 +143,37 @@ const DTEView: React.FC<DTEViewProps> = ({ activeTab, exposuresData, loading }) 
 
             {/* SPXW Diagnostic (shows SPXW quote for comparison) */}
             {spxwQuote && (
-              <div className="card bg-gray-50 border-gray-300">
-                <div className="text-sm font-medium text-gray-700 mb-2">SPXW Quote (Diagnostic)</div>
+              <div className={`card ${spxwQuote.is_fallback ? 'bg-orange-50 border-orange-300' : 'bg-gray-50 border-gray-300'}`}>
+                <div className="text-sm font-medium text-gray-700 mb-2 flex items-center gap-2">
+                  SPXW Quote (Diagnostic)
+                  {spxwQuote.is_fallback && (
+                    <span className="px-2 py-1 text-xs bg-orange-100 text-orange-800 rounded-full font-medium">
+                      Using SPX Fallback
+                    </span>
+                  )}
+                </div>
                 <div className="text-lg font-semibold text-gray-900">
                   {spxwQuote.last?.toFixed(2)}
                 </div>
                 <div className="text-xs text-gray-600 mt-1">
-                  SPXW is "S&P Weeklys dummy underlying" - used for weekly options
-                  {exposuresData && (
-                    <span className="block mt-1">
-                      Delta: {(exposuresData.spot - spxwQuote.last)?.toFixed(2)} points
-                    </span>
+                  {spxwQuote.is_fallback ? (
+                    <>
+                      SPXW data unavailable - showing SPX quote for comparison
+                      {exposuresData && (
+                        <span className="block mt-1 text-orange-700 font-medium">
+                          ⚠️ Delta calculation invalid (comparing SPX to SPX)
+                        </span>
+                      )}
+                    </>
+                  ) : (
+                    <>
+                      SPXW is "S&P Weeklys dummy underlying" - used for weekly options
+                      {exposuresData && (
+                        <span className="block mt-1">
+                          Delta: {(exposuresData.spot - spxwQuote.last)?.toFixed(2)} points
+                        </span>
+                      )}
+                    </>
                   )}
                 </div>
               </div>

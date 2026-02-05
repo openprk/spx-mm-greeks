@@ -197,9 +197,9 @@ const MarketClock: React.FC = () => {
 
   if (error || !clockData) {
     return (
-      <div className="bg-white rounded-lg border border-gray-200 p-3 shadow-sm">
-        <div className="text-xs text-gray-500 mb-1">Market Clock</div>
-        <div className="text-red-600 text-sm">
+      <div className="bg-white rounded-lg border border-gray-200 p-2 sm:p-3 shadow-sm min-w-0 w-full sm:w-auto max-w-xs sm:max-w-none">
+        <div className="text-xs sm:text-sm text-gray-500 mb-1">Market Clock</div>
+        <div className="text-red-600 text-xs sm:text-sm">
           {error || 'No data'}
         </div>
       </div>
@@ -209,8 +209,8 @@ const MarketClock: React.FC = () => {
   const { clock } = clockData;
 
   return (
-    <div className="bg-white rounded-lg border border-gray-200 p-3 shadow-sm">
-      <div className="text-xs text-gray-500 mb-1">Market Clock</div>
+    <div className="bg-white rounded-lg border border-gray-200 p-2 sm:p-3 shadow-sm min-w-0 w-full sm:w-auto max-w-xs sm:max-w-none">
+      <div className="text-xs sm:text-sm text-gray-500 mb-1">Market Clock</div>
 
       {/* Current Status */}
       <div className="mb-2">
@@ -220,21 +220,21 @@ const MarketClock: React.FC = () => {
       </div>
 
       {/* Description */}
-      <div className="text-xs text-gray-700 mb-2">
+      <div className="text-xs sm:text-sm text-gray-700 mb-2 leading-tight">
         {clock.description}
       </div>
 
-      {/* Date and Time */}
-      <div className="text-xs text-gray-600">
-        <div>Date: {(() => {
+      {/* Date and Time - Responsive layout */}
+      <div className="text-xs sm:text-sm text-gray-600 space-y-0.5">
+        <div className="truncate">Date: {(() => {
           const now = new Date();
           const utcDate = now.toISOString().split('T')[0];
           const [year, month, day] = utcDate.split('-');
           return `${month}/${day}/${year}`;
         })()}</div>
-        <div>Market Time: {formatTime(new Date().toLocaleString('en-US', {timeZone: 'America/New_York'}))}</div>
-        <div className="text-gray-500">Your Local: {formatTime(currentTime.toISOString())}</div>
-        <div className="text-gray-500">Last updated: {formatTime(clock.timestamp)}</div>
+        <div className="truncate">Market: {formatTime(new Date().toLocaleString('en-US', {timeZone: 'America/New_York'}))}</div>
+        <div className="text-gray-500 truncate text-xs">Local: {formatTime(currentTime.toISOString())}</div>
+        <div className="text-gray-500 truncate text-xs">Updated: {formatTime(clock.timestamp)}</div>
       </div>
 
       {/* Next Events Section */}
@@ -245,12 +245,12 @@ const MarketClock: React.FC = () => {
 
         return (
           <div className="mt-2 pt-2 border-t border-gray-100">
-            <div className="text-xs text-gray-500 space-y-1">
+            <div className="text-xs sm:text-sm text-gray-500 space-y-1">
               {clock.next_change && clock.next_state && (
-                <div>Next: {clock.next_change} ({clock.next_state})</div>
+                <div className="truncate">Next: {clock.next_change} ({clock.next_state})</div>
               )}
               {nextTradingDay && nextTradingDay.date !== today && (
-                <div className="text-blue-600">
+                <div className="text-blue-600 text-xs sm:text-sm truncate">
                   Next Trading Day: {(() => {
                     const [year, month, day] = nextTradingDay.date.split('-');
                     return `${month}/${day}/${year}`;

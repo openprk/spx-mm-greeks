@@ -73,6 +73,19 @@ main {
   margin: 0 auto !important;
 }
 
+/* Mobile-specific chart height adjustments */
+@media (max-width: 768px) {
+  .js-plotly-plot {
+    height: 350px !important;
+  }
+}
+
+@media (max-width: 480px) {
+  .js-plotly-plot {
+    height: 280px !important;
+  }
+}
+
 .js-plotly-plot .plotly-notifier {
   display: none !important;
 }

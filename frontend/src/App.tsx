@@ -152,18 +152,18 @@ function App() {
       {/* Header */}
       <header className="bg-white shadow-sm border-b">
         <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-4">
-          <div className="flex justify-between items-start">
-            <div>
-              <h1 className="text-2xl font-bold text-gray-900">
+          <div className="flex flex-col sm:flex-row sm:justify-between sm:items-start gap-4">
+            <div className="flex-1">
+              <h1 className="text-xl sm:text-2xl font-bold text-gray-900">
                 SPX Market Maker Greek Exposures
               </h1>
-              <p className="text-sm text-gray-600 mt-1">
+              <p className="text-xs sm:text-sm text-gray-600 mt-1">
                 Real-time GEX/DEX/VEX/CEX analysis with regime classification
               </p>
             </div>
 
-            {/* Market Clock - Top Right */}
-            <div className="ml-4">
+            {/* Market Clock - Responsive positioning */}
+            <div className="flex-shrink-0 self-start sm:self-auto">
               <MarketClock />
             </div>
           </div>

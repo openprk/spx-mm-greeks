@@ -297,7 +297,6 @@ const Heatmap: React.FC<HeatmapProps> = ({
   const layout = useMemo(() => {
     const baseLayout = {
       margin: { t: 80, r: 120, b: 80, l: 80 },
-      height: 500,
       width: undefined,
       autosize: true,
       showlegend: true,
@@ -420,7 +419,7 @@ const Heatmap: React.FC<HeatmapProps> = ({
 
   if (loading && !exposuresData && !matrixData) {
     return (
-      <div className="flex items-center justify-center h-96">
+      <div className="flex items-center justify-center h-72 sm:h-80 md:h-96">
         <div className="animate-pulse">
           <div className="h-4 bg-gray-200 rounded mb-2 w-48"></div>
           <div className="h-64 bg-gray-200 rounded"></div>
@@ -432,7 +431,7 @@ const Heatmap: React.FC<HeatmapProps> = ({
   // Show loading state if we have no data but expect it soon
   if (!exposuresData && !matrixData) {
     return (
-      <div className="flex items-center justify-center h-96">
+      <div className="flex items-center justify-center h-72 sm:h-80 md:h-96">
         <div className="text-center">
           <div className="text-gray-400 mb-2">
             <svg className="w-12 h-12 mx-auto animate-spin" fill="none" stroke="currentColor" viewBox="0 0 24 24">
@@ -450,7 +449,7 @@ const Heatmap: React.FC<HeatmapProps> = ({
     try {
       if (plotData.length === 0) {
         return (
-          <div className="flex items-center justify-center h-96">
+          <div className="flex items-center justify-center h-72 sm:h-80 md:h-96">
             <div className="text-center">
               <div className="text-gray-400 mb-2">
                 <svg className="w-12 h-12 mx-auto" fill="none" stroke="currentColor" viewBox="0 0 24 24">
@@ -464,7 +463,7 @@ const Heatmap: React.FC<HeatmapProps> = ({
       }
 
       return (
-        <div style={{ width: '100%', height: '500px' }}>
+        <div className="w-full h-72 sm:h-80 md:h-96 lg:h-[500px]">
           <Plot
             data={plotData}
             layout={layout}

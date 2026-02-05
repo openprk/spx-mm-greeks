@@ -1,7 +1,7 @@
 from typing import Dict, List, Tuple, Optional
 import numpy as np
 from backend.models import Regime, AggregateData
-from backend.exposures import calculate_neutral_threshold, classify_regime
+from backend.utils import calculate_neutral_threshold, classify_regime
 
 def classify_exposure_regime(
     gex: float, dex: float, vex: float, cex: float,
@@ -29,122 +29,124 @@ def determine_market_alerts(
     spot_price: float = 0,
     key_strikes: List[float] = None,
     mode: str = "ALL"
-) -> List[str]:
+) -> List[dict]:
     """
-    Generate intelligent, contextual market alerts based on regime + spot price combinations.
-    Alerts change meaning based on market conditions and positioning - not just proximity.
+    Generate consolidated market alerts with structured data.
+    Returns core alert types with parameters instead of 35+ specific strings.
     """
     if key_strikes is None:
         key_strikes = []
 
     alerts = []
 
-    # Analyze regime characteristics for intelligent alerting
+    # Analyze regime characteristics
     g, d, v, c = regime.g, regime.d, regime.v, regime.c
+    is_bullish_momentum = (g == "+" and d == "+" and c == "-")
+    is_bearish_momentum = (g == "-" and d == "-" and c == "+")
+    is_high_volatility = (g == "-" and v == "+")
+    is_low_volatility = (g == "+" and v == "-")
 
-    # Determine market momentum and risk context
-    is_bullish_momentum = (g == "+" and d == "+" and c == "-")  # Compression + buying
-    is_bearish_momentum = (g == "-" and d == "-" and c == "+")  # Acceleration bearish
-    is_high_volatility = (g == "-" and v == "+")  # Negative GEX + positive VEX
-    is_low_volatility = (g == "+" and v == "-")  # Positive GEX + negative VEX
-    is_time_decay_critical = (c == "+" or c == "-")  # Charm has significant impact
-
-    # Context-aware alerts based on regime + spot price positioning
+    # 1. LEVEL_APPROACHING (support/resistance)
     if key_strikes and spot_price > 0:
-        # Find nearest strikes above and below current price
         strikes_above = [s for s in key_strikes if s > spot_price]
         strikes_below = [s for s in key_strikes if s < spot_price]
 
-        # RESISTANCE LEVEL ALERTS - Context matters!
+        # Check resistance levels
         if strikes_above:
             nearest_resistance = min(strikes_above)
-            distance_to_resistance = (nearest_resistance - spot_price) / spot_price
+            distance_pct = ((nearest_resistance - spot_price) / spot_price) * 100
 
-            if distance_to_resistance < 0.01:  # Within 1% of resistance
-                if is_bullish_momentum:
-                    if distance_to_resistance < 0.002:  # Very close
-                        alerts.append("BULLISH_BREAKOUT_IMMINENT")
-                    else:
-                        alerts.append("COMPRESSION_TEST_OF_RESISTANCE")
-                elif is_bearish_momentum:
-                    alerts.append("BEARISH_RESISTANCE_REJECTION_LIKELY")
-                elif is_high_volatility:
-                    alerts.append("VOLATILE_RESISTANCE_PIN_RISK")
-                else:
-                    alerts.append("NEUTRAL_RESISTANCE_APPROACH")
+            if distance_pct < 1.0:  # Within 1% of resistance
+                regime_context = "bullish" if is_bullish_momentum else "bearish" if is_bearish_momentum else "neutral"
+                if is_high_volatility:
+                    regime_context = "volatile"
 
-        # SUPPORT LEVEL ALERTS - Context matters!
+                alerts.append({
+                    "type": "LEVEL_APPROACHING",
+                    "side": "resistance",
+                    "distance_pct": round(distance_pct, 2),
+                    "distance_points": round(nearest_resistance - spot_price, 1),
+                    "strike": nearest_resistance,
+                    "regime_context": regime_context
+                })
+
+        # Check support levels
         if strikes_below:
             nearest_support = max(strikes_below)
-            distance_to_support = (spot_price - nearest_support) / spot_price
+            distance_pct = ((spot_price - nearest_support) / spot_price) * 100
 
-            if distance_to_support < 0.01:  # Within 1% of support
-                if is_bearish_momentum:
-                    if distance_to_support < 0.002:  # Very close
-                        alerts.append("BEARISH_BREAKDOWN_IMMINENT")
-                    else:
-                        alerts.append("ACCELERATION_TEST_OF_SUPPORT")
-                elif is_bullish_momentum:
-                    alerts.append("BULLISH_SUPPORT_DEFENSE_STRONG")
-                elif is_high_volatility:
-                    alerts.append("VOLATILE_SUPPORT_PIN_RISK")
-                else:
-                    alerts.append("NEUTRAL_SUPPORT_APPROACH")
+            if distance_pct < 1.0:  # Within 1% of support
+                regime_context = "bearish" if is_bearish_momentum else "bullish" if is_bullish_momentum else "neutral"
+                if is_high_volatility:
+                    regime_context = "volatile"
 
-    # REGIME-SPECIFIC PATTERN ALERTS (from MD files)
+                alerts.append({
+                    "type": "LEVEL_APPROACHING",
+                    "side": "support",
+                    "distance_pct": round(distance_pct, 2),
+                    "distance_points": round(spot_price - nearest_support, 1),
+                    "strike": nearest_support,
+                    "regime_context": regime_context
+                })
+
+    # 2. SPOT_PATTERN_CRITICAL (regime-specific dangerous patterns)
     if regime_code == "G- D- V- C+":
-        alerts.append("MAX_DOWNSIDE_ACCELERATION")
-        # Additional context for this dangerous pattern
-        if mode == "0DTE":
-            alerts.append("EXTREME_0DTE_RISK_SETUP")
-
+        alerts.append({
+            "type": "SPOT_PATTERN_CRITICAL",
+            "pattern": "max_acceleration",
+            "description": "Maximum downside acceleration - extreme bearish momentum"
+        })
     elif regime_code == "G+ D+ V+ C-":
-        alerts.append("COMPRESSION_PIN_SETUP")
-        if mode == "0DTE":
-            alerts.append("HIGH_PROBABILITY_0DTE_PIN")
+        alerts.append({
+            "type": "SPOT_PATTERN_CRITICAL",
+            "pattern": "compression_pin",
+            "description": "Compression pin setup - potential price magnet"
+        })
 
-    elif regime_code == "G- D- V+ C-":
-        alerts.append("VOL_CUSHION_TRAP_ACTIVE")
-        alerts.append("MOMENTUM_WITH_VOLATILITY_BUFFER")
+    # 3. VOL_REGIME (high/low volatility)
+    if is_high_volatility:
+        alerts.append({
+            "type": "VOL_REGIME",
+            "level": "high",
+            "description": "Negative GEX + Positive VEX = High volatility regime"
+        })
+    elif is_low_volatility:
+        alerts.append({
+            "type": "VOL_REGIME",
+            "level": "low",
+            "description": "Positive GEX + Negative VEX = Low volatility regime"
+        })
 
-    elif regime_code == "G+ D+ V- C+":
-        alerts.append("BOUNCE_CANDIDATE_ACTIVE")
-        alerts.append("REVERSAL_SETUP_FAVORABLE")
-
-    # VIX REGIME CONTEXT (when available)
-    if vix_regime == "RISING" and is_high_volatility:
-        alerts.append("VIX_SPIKE_AMPLIFYING_VOLATILITY")
-    elif vix_regime == "FALLING" and is_bullish_momentum:
-        alerts.append("VIX_CALM_SUPPORTING_UPSIDE")
-
-    # 0DTE-SPECIFIC CONTEXT
+    # 4. 0DTE_SESSION_STATUS (only for 0DTE mode)
     if mode == "0DTE":
-        alerts.append("TRADING_0DTE_SESSION")
-
-        # Time-based risk escalation for 0DTE
         from datetime import datetime
         now = datetime.now()
         hour = now.hour
 
         if hour < 10:
-            alerts.append("EARLY_0DTE_LOW_RISK_PERIOD")
+            session_phase = "early"
+            risk_level = "low"
         elif hour > 15:
-            alerts.append("LATE_0DTE_HIGH_RISK_PERIOD")
-            if is_time_decay_critical:
-                alerts.append("CRITICAL_TIME_DECAY_WINDOW")
+            session_phase = "late"
+            risk_level = "high"
         else:
-            alerts.append("MID_0DTE_ACTIVE_PERIOD")
+            session_phase = "mid"
+            risk_level = "normal"
 
-        # 0DTE-specific regime warnings
-        if is_high_volatility and (is_bearish_momentum or is_bullish_momentum):
-            alerts.append("0DTE_EXTREME_REGIME_RISK")
+        # Increase risk if high volatility regime
+        if is_high_volatility:
+            risk_level = "extreme"
 
-    # HIGH-RISK COMBINATIONS
-    if is_bearish_momentum and is_high_volatility and mode == "0DTE":
-        alerts.append("MAX_RISK_0DTE_SETUP")
+        alerts.append({
+            "type": "0DTE_SESSION_STATUS",
+            "session_phase": session_phase,
+            "risk_level": risk_level,
+            "description": f"0DTE session {session_phase} with {risk_level} risk"
+        })
 
-    if is_bullish_momentum and is_time_decay_critical and distance_to_resistance < 0.005:
-        alerts.append("TIME_DECAY_BREAKOUT_OPPORTUNITY")
+    # 5. STRIKE_EXTREMES (only for extreme thresholds)
+    # Placeholder for future implementation - would check for strikes with
+    # extreme GEX values beyond normal thresholds
 
     return alerts
 

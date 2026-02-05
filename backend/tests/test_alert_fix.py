@@ -75,8 +75,9 @@ def test_alert_fix_closest_strikes():
     print(f"NEW alerts: {new_alerts}")
 
     # New approach should generate proximity alerts since spot is near the strikes
-    proximity_alerts = [alert for alert in new_alerts if "RESISTANCE" in alert or "SUPPORT" in alert]
-    assert len(proximity_alerts) > 0, "New approach should generate proximity alerts"
+    # Updated to work with new structured alert objects
+    proximity_alerts = [alert for alert in new_alerts if alert.get("type") == "LEVEL_APPROACHING"]
+    assert len(proximity_alerts) > 0, "New approach should generate LEVEL_APPROACHING alerts"
 
     print("TEST PASSED: Alert fix works correctly!")
     print("Proximity alerts are now based on strikes closest to spot price")
@@ -123,7 +124,7 @@ def test_spot_at_edge_cases():
             assert len(proximity_alerts) > 0, f"Should have proximity alerts when near strikes at {spot_price}"
             print("Correctly generated proximity alerts")
         else:
-            print("ℹ️ No proximity alerts (as expected - spot not near any strike)")
+            print("No proximity alerts (as expected - spot not near any strike)")
 
 
 if __name__ == "__main__":

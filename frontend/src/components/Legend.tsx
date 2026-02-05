@@ -1,12 +1,50 @@
 import React from 'react';
-import type { ExposuresResponse } from '../types/api';
+import type { ExposuresResponse, MarketAlert } from '../types/api';
 
 interface LegendProps {
   exposuresData?: ExposuresResponse | null;
 }
 
 // Alert styling based on risk level and context
-const getAlertStyling = (alert: string) => {
+const getAlertStyling = (alert: MarketAlert) => {
+  // For LEVEL_APPROACHING alerts, style based on regime context
+  if (alert.type === 'LEVEL_APPROACHING') {
+    const regimeContext = alert.regime_context || 'neutral';
+    switch (regimeContext) {
+      case 'bullish':
+        return {
+          bgColor: 'bg-green-50',
+          borderColor: 'border-green-200',
+          textColor: 'text-green-700',
+          icon: '📈'
+        };
+      case 'bearish':
+        return {
+          bgColor: 'bg-red-50',
+          borderColor: 'border-red-200',
+          textColor: 'text-red-700',
+          icon: '📉'
+        };
+      case 'volatile':
+        return {
+          bgColor: 'bg-yellow-50',
+          borderColor: 'border-yellow-200',
+          textColor: 'text-yellow-700',
+          icon: '⚡'
+        };
+      default: // neutral
+        return {
+          bgColor: 'bg-blue-50',
+          borderColor: 'border-blue-200',
+          textColor: 'text-blue-700',
+          icon: 'ℹ️'
+        };
+    }
+  }
+
+  // Legacy string-based alerts (for backward compatibility)
+  const alertString = typeof alert === 'string' ? alert : alert.type;
+
   // High-risk alerts (red)
   const highRiskAlerts = [
     'MAX_DOWNSIDE_ACCELERATION', 'MAX_RISK_0DTE_SETUP', 'EXTREME_0DTE_RISK_SETUP',
@@ -26,21 +64,21 @@ const getAlertStyling = (alert: string) => {
     'BEARISH_RESISTANCE_REJECTION_LIKELY', 'VIX_SPIKE_AMPLIFYING_VOLATILITY'
   ];
 
-  if (highRiskAlerts.includes(alert)) {
+  if (highRiskAlerts.includes(alertString)) {
     return {
       bgColor: 'bg-red-50',
       borderColor: 'border-red-200',
       textColor: 'text-red-700',
       icon: '🚨'
     };
-  } else if (opportunityAlerts.includes(alert)) {
+  } else if (opportunityAlerts.includes(alertString)) {
     return {
       bgColor: 'bg-green-50',
       borderColor: 'border-green-200',
       textColor: 'text-green-700',
       icon: '💹'
     };
-  } else if (cautionAlerts.includes(alert)) {
+  } else if (cautionAlerts.includes(alertString)) {
     return {
       bgColor: 'bg-yellow-50',
       borderColor: 'border-yellow-200',
@@ -58,9 +96,33 @@ const getAlertStyling = (alert: string) => {
   }
 };
 
+// Generate display name from alert object or string
+const getAlertDisplayName = (alert: MarketAlert | string): string => {
+  // Handle MarketAlert objects
+  if (typeof alert === 'object' && alert.type) {
+    if (alert.type === 'LEVEL_APPROACHING') {
+      const regime = (alert.regime_context || 'neutral').toUpperCase();
+      const side = (alert.side || 'unknown').toUpperCase();
+      return `${regime} ${side} APPROACH`;
+    }
+    // For other alert types, use the type field
+    return alert.type.replace(/_/g, ' ');
+  }
+
+  // Handle legacy string alerts
+  if (typeof alert === 'string') {
+    return alert.replace(/_/g, ' ');
+  }
+
+  // Fallback
+  return 'Unknown Alert';
+};
+
 // Intelligent alert descriptions based on regime + spot price context
-const getAlertDescription = (alert: string): string => {
-  const descriptions: Record<string, string> = {
+const getAlertDescription = (alert: MarketAlert | string): string => {
+  // Handle string alerts directly
+  if (typeof alert === 'string') {
+    const descriptions: Record<string, string> = {
     // Regime-specific pattern alerts
     'MAX_DOWNSIDE_ACCELERATION': 'Extreme bearish alignment (G- D- V- C+) indicating maximum downward momentum acceleration',
     'COMPRESSION_PIN_SETUP': 'Bullish compression regime (G+ D+ V+ C-) creating pin behavior potential',
@@ -103,9 +165,45 @@ const getAlertDescription = (alert: string): string => {
     'NEUTRAL_RESISTANCE_APPROACH': 'Approaching resistance in neutral regime - monitor for direction',
     'NEUTRAL_SUPPORT_APPROACH': 'Approaching support in neutral regime - monitor for direction',
     'MOMENTUM_WITH_VOLATILITY_BUFFER': 'Momentum present but volatility provides cushioning effect'
-  };
+    };
 
-  return descriptions[alert] || 'Contextual market alert condition detected';
+    return descriptions[alert] || 'Contextual market alert condition detected';
+  }
+
+  // Handle MarketAlert objects
+  if (typeof alert === 'object' && alert.type) {
+    if (alert.type === 'LEVEL_APPROACHING') {
+      const side = alert.side || 'unknown';
+      const regime = alert.regime_context || 'neutral';
+      const distancePct = alert.distance_pct ? `${alert.distance_pct}%` : 'close proximity';
+      const distancePoints = alert.distance_points ? `${alert.distance_points} points` : '';
+
+      let description = `Approaching ${side} in ${regime} regime`;
+      if (distancePoints) {
+        description += ` (${distancePct} / ${distancePoints})`;
+      }
+      description += ' - monitor for direction';
+
+      return description;
+    }
+
+    // Handle other structured alert types here as needed
+    if (alert.type === 'SPOT_PATTERN_CRITICAL') {
+      return 'Critical pattern detected at spot strike - extreme caution required';
+    }
+    if (alert.type === 'VOL_REGIME') {
+      return 'Volatility regime change detected - monitor for volatility expansion';
+    }
+    if (alert.type === '0DTE_SESSION_STATUS') {
+      return '0DTE session status alert - heightened sensitivity period';
+    }
+    if (alert.type === 'STRIKE_EXTREMES') {
+      return 'Strike extremes reached - potential reversal or acceleration';
+    }
+  }
+
+  // Fallback
+  return 'Contextual market alert condition detected';
 };
 
 const Legend: React.FC<LegendProps> = ({ exposuresData }) => {
@@ -255,7 +353,7 @@ const Legend: React.FC<LegendProps> = ({ exposuresData }) => {
               return (
                 <div key={`market-${index}`} className={`text-xs p-2 rounded border ${alertStyle.bgColor} ${alertStyle.borderColor}`}>
                   <div className="flex items-center">
-                    <span className={`font-medium ${alertStyle.textColor}`}>{alertStyle.icon} {alert.replace(/_/g, ' ')}</span>
+                    <span className={`font-medium ${alertStyle.textColor}`}>{alertStyle.icon} {getAlertDisplayName(alert)}</span>
                   </div>
                   <p className="text-gray-600 mt-1">
                     {getAlertDescription(alert)}

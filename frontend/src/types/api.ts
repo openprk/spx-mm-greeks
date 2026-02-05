@@ -35,6 +35,11 @@ export interface Regime {
   c: string; // "+" | "-" | "o"
 }
 
+export interface MarketAlert {
+  type: string;
+  [key: string]: any; // Flexible fields based on alert type
+}
+
 export interface AggregateData {
   gex: number;
   dex: number;
@@ -44,7 +49,7 @@ export interface AggregateData {
   regime_code: string;
   conductivity: string;
   notes: string;
-  market_alerts?: string[]; // Dynamic alerts based on market regime conditions
+  market_alerts?: MarketAlert[]; // Consolidated alerts with structured data
 }
 
 export interface StrikeData {

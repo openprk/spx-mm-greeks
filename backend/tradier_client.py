@@ -17,6 +17,7 @@ class TradierClient:
         async with httpx.AsyncClient(timeout=30.0) as client:
             response = await client.get(url, headers=self.headers, params=params)
             response.raise_for_status()
+            response.encoding = 'utf-8'
             data = response.json()
 
             if "quotes" in data and "quote" in data["quotes"]:
@@ -43,6 +44,7 @@ class TradierClient:
             async with httpx.AsyncClient(timeout=30.0) as client:
                 response = await client.get(url, headers=self.headers, params=params)
                 response.raise_for_status()
+                response.encoding = 'utf-8'
                 data = response.json()
 
                 if "quotes" in data and "quote" in data["quotes"]:
@@ -59,7 +61,7 @@ class TradierClient:
                     }
                 else:
                     # Fallback to SPX quote if SPXW not available
-                    print("🔥 SPXW quote not available, falling back to SPX")
+                    print("SPXW quote not available, falling back to SPX")
                     spx_data = await self.get_spx_quote()
                     # Return SPX data but mark as fallback
                     return {
@@ -73,7 +75,7 @@ class TradierClient:
                         "is_fallback": True  # Indicates this is SPX data used as fallback
                     }
         except Exception as e:
-            print(f"🔥 SPXW quote API error: {e}, falling back to SPX")
+            print(f"SPXW quote API error: {e}, falling back to SPX")
             return await self.get_spx_quote()
 
     async def get_spx_expirations(self) -> list:
@@ -85,25 +87,26 @@ class TradierClient:
             async with httpx.AsyncClient(timeout=30.0) as client:
                 response = await client.get(url, headers=self.headers, params=params)
                 response.raise_for_status()
+                response.encoding = 'utf-8'
                 data = response.json()
 
                 if "expirations" in data and "date" in data["expirations"]:
                     dates = data["expirations"]["date"]
                     if dates is None:
-                        print(f"📅 Tradier returned null dates")
+                        print(f"Tradier returned null dates")
                         raise Exception("No expiration data available")
                     # Ensure we return a list of strings
                     if isinstance(dates, list):
-                        print(f"📅 Tradier returned {len(dates)} expiration dates")
+                        print(f"Tradier returned {len(dates)} expiration dates")
                         return dates
                     else:
-                        print(f"📅 Tradier returned 1 expiration date")
+                        print(f"Tradier returned 1 expiration date")
                         return [dates]
                 else:
-                    print(f"📅 Tradier returned no expirations")
+                    print(f"Tradier returned no expirations")
                     raise Exception("No expiration data available")
         except Exception as e:
-            print(f"📅 API error getting expirations: {e}")
+            print(f"API error getting expirations: {e}")
             raise Exception(f"Tradier API unavailable: {e}")
 
     async def get_spxw_expirations(self) -> list:
@@ -115,31 +118,32 @@ class TradierClient:
             async with httpx.AsyncClient(timeout=30.0) as client:
                 response = await client.get(url, headers=self.headers, params=params)
                 response.raise_for_status()
+                response.encoding = 'utf-8'
                 data = response.json()
 
                 if "expirations" in data and "date" in data["expirations"]:
                     dates = data["expirations"]["date"]
                     if dates is None:
-                        print(f"📅 SPXW: Tradier returned null dates")
+                        print(f"SPXW: Tradier returned null dates")
                         # Fallback to SPX expirations if SPXW fails
-                        print(f"📅 Falling back to SPX expirations for SPXW request")
+                        print(f"Falling back to SPX expirations for SPXW request")
                         return await self.get_spx_expirations()
                     # Ensure we return a list of strings
                     if isinstance(dates, list):
-                        print(f"📅 SPXW: Tradier returned {len(dates)} expiration dates")
+                        print(f"SPXW: Tradier returned {len(dates)} expiration dates")
                         return dates
                     else:
-                        print(f"📅 SPXW: Tradier returned 1 expiration date")
+                        print(f"SPXW: Tradier returned 1 expiration date")
                         return [dates]
                 else:
-                    print(f"📅 SPXW: Tradier returned no expirations")
+                    print(f"SPXW: Tradier returned no expirations")
                     # Fallback to SPX expirations if SPXW fails
-                    print(f"📅 Falling back to SPX expirations for SPXW request")
+                    print(f"Falling back to SPX expirations for SPXW request")
                     return await self.get_spx_expirations()
         except Exception as e:
-            print(f"📅 SPXW API error getting expirations: {e}")
+            print(f"SPXW API error getting expirations: {e}")
             # Fallback to SPX expirations
-            print(f"📅 Falling back to SPX expirations due to SPXW API error")
+            print(f"Falling back to SPX expirations due to SPXW API error")
             return await self.get_spx_expirations()
 
     async def get_spx_chain(self, expiration: str) -> dict:
@@ -155,35 +159,37 @@ class TradierClient:
             async with httpx.AsyncClient(timeout=30.0) as client:
                 response = await client.get(url, headers=self.headers, params=params)
                 response.raise_for_status()
+                response.encoding = 'utf-8'
                 data = response.json()
 
                 # Debug logging
                 if "options" in data and "option" in data["options"]:
                     options = data["options"]["option"]
                     if options is None:
-                        print(f"🔍 Tradier returned null options for {expiration}")
+                        print(f"Tradier returned null options for {expiration}")
                         raise Exception("No options data available")
                     if isinstance(options, list):
                         if len(options) > 0:
-                            print(f"🔍 Tradier returned {len(options)} options for {expiration}")
+                            print(f"Tradier returned {len(options)} options for {expiration}")
                             return {"options": options}
                         else:
-                            print(f"🔍 Tradier returned empty options list for {expiration}")
+                            print(f"Tradier returned empty options list for {expiration}")
                             raise Exception("No options data available")
                     else:
-                        print(f"🔍 Tradier returned 1 option for {expiration}")
+                        print(f"Tradier returned 1 option for {expiration}")
                         return {"options": [options]}
                 else:
-                    print(f"🔍 Tradier returned no options for {expiration}")
+                    print(f"Tradier returned no options for {expiration}")
                     raise Exception("No options data available")
         except Exception as e:
-            print(f"🔍 API error for {expiration}: {e}")
+            print(f"API error for {expiration}: {e}")
             raise Exception(f"Tradier API unavailable: {e}")
 
         try:
             async with httpx.AsyncClient(timeout=30.0) as client:
                 response = await client.get(url, headers=self.headers, params=params)
                 response.raise_for_status()
+                response.encoding = 'utf-8'
                 data = response.json()
 
                 # Debug logging
@@ -191,19 +197,19 @@ class TradierClient:
                     options = data["options"]["option"]
                     if isinstance(options, list):
                         if len(options) > 0:
-                            print(f"🔍 Tradier returned {len(options)} options for {expiration}")
+                            print(f"Tradier returned {len(options)} options for {expiration}")
                             return {"options": options}
                         else:
-                            print(f"🔍 Tradier returned empty options list for {expiration}")
+                            print(f"Tradier returned empty options list for {expiration}")
                             raise Exception("No options data available")
                     else:
-                        print(f"🔍 Tradier returned 1 option for {expiration}")
+                        print(f"Tradier returned 1 option for {expiration}")
                         return {"options": [options]}
                 else:
-                    print(f"🔍 Tradier returned no options for {expiration}")
+                    print(f"Tradier returned no options for {expiration}")
                     raise Exception("No options data available")
         except Exception as e:
-            print(f"🔍 API error for {expiration}: {e}")
+            print(f"API error for {expiration}: {e}")
             raise Exception(f"Tradier API unavailable: {e}")
 
 
@@ -214,6 +220,7 @@ class TradierClient:
         async with httpx.AsyncClient(timeout=30.0) as client:
             response = await client.get(url, headers=self.headers)
             response.raise_for_status()
+            response.encoding = 'utf-8'
             data = response.json()
 
             return data
@@ -226,6 +233,7 @@ class TradierClient:
         async with httpx.AsyncClient(timeout=30.0) as client:
             response = await client.get(url, headers=self.headers, params=params)
             response.raise_for_status()
+            response.encoding = 'utf-8'
 
             try:
                 data = response.json()
@@ -257,34 +265,35 @@ class TradierClient:
             async with httpx.AsyncClient(timeout=30.0) as client:
                 response = await client.get(url, headers=self.headers, params=params)
                 response.raise_for_status()
+                response.encoding = 'utf-8'
                 data = response.json()
 
                 # Debug logging
                 if "options" in data and "option" in data["options"]:
                     options = data["options"]["option"]
                     if options is None:
-                        print(f"🔥 SPXW: Tradier returned null options for {expiration}")
+                        print(f"SPXW: Tradier returned null options for {expiration}")
                         raise Exception("No options data available")
                     if isinstance(options, list):
                         if len(options) > 0:
-                            print(f"🔥 SPXW: Tradier returned {len(options)} options for {expiration}")
+                            print(f"SPXW: Tradier returned {len(options)} options for {expiration}")
                             return {"options": options}
                         else:
-                            print(f"🔥 SPXW: Tradier returned empty options list for {expiration}")
+                            print(f"SPXW: Tradier returned empty options list for {expiration}")
                             return {"options": []}
                     else:
                         # Single option returned
-                        print(f"🔥 SPXW: Tradier returned 1 option for {expiration}")
+                        print(f"SPXW: Tradier returned 1 option for {expiration}")
                         return {"options": [options]}
                 else:
-                    print(f"🔥 SPXW: Unexpected response structure for {expiration}")
-                    print(f"🔥 Response keys: {list(data.keys()) if isinstance(data, dict) else 'non-dict'}")
+                    print(f"SPXW: Unexpected response structure for {expiration}")
+                    print(f"Response keys: {list(data.keys()) if isinstance(data, dict) else 'non-dict'}")
                     return {"options": []}
 
         except Exception as e:
-            print(f"🔥 SPXW API error for {expiration}: {e}")
+            print(f"SPXW API error for {expiration}: {e}")
             # Fallback: try SPX data if SPXW fails (for development/testing)
-            print(f"🔥 Falling back to SPX data for SPXW request on {expiration}")
+            print(f"Falling back to SPX data for SPXW request on {expiration}")
             return await self.get_spx_chain(expiration)
 
     def _get_mock_spxw_data(self, expiration: str) -> dict:
@@ -349,5 +358,5 @@ class TradierClient:
                     "root_symbol": "SPXW"
                 })
 
-        print(f"🔥 SPXW: Generated {len(mock_options)} mock options for {expiration}")
+        print(f"SPXW: Generated {len(mock_options)} mock options for {expiration}")
         return {"options": mock_options}  # Return empty list if no options found

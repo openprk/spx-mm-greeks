@@ -41,6 +41,20 @@ class Regime(BaseModel):
     v: str  # "+" or "-" or "o"
     c: str  # "+" or "-" or "o"
 
+class MarketAlert(BaseModel):
+    """Structured market alert with parameters"""
+    type: str
+    side: Optional[str] = None
+    distance_pct: Optional[float] = None
+    distance_points: Optional[float] = None
+    strike: Optional[float] = None
+    regime_context: Optional[str] = None
+    pattern: Optional[str] = None
+    description: Optional[str] = None
+    session_phase: Optional[str] = None
+    risk_level: Optional[str] = None
+    level: Optional[str] = None
+
 class StrikeData(BaseModel):
     """Data for a specific strike"""
     strike: float
@@ -66,7 +80,7 @@ class AggregateData(BaseModel):
     regime_code: str
     conductivity: str
     notes: str
-    market_alerts: List[str] = []  # Dynamic alerts based on market regime conditions
+    market_alerts: List[MarketAlert] = []  # Dynamic alerts based on market regime conditions
 
 class ExposuresResponse(BaseModel):
     """API response for exposures endpoint"""

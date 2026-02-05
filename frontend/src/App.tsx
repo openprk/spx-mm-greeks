@@ -64,7 +64,7 @@ function App() {
         console.log('📡 Expirations response:', { status: expResponse.status, ok: expResponse.ok });
         const expData: ExpirationsResponse = await expResponse.json();
         console.log('📦 Expirations data:', expData);
-        setExpirations(expData.expirations);
+        setExpirations(expData.expirations || []);
 
           // Set first available expiration if we don't have one set
           // Skip today's date as it might not have options data yet
@@ -124,7 +124,7 @@ function App() {
       }); // YYYY-MM-DD format in US/Eastern
       startPolling(today, metric, 'AUTO', '0DTE', 1000); // 1 second refresh
     }
-  }, [activeTab, expiration, metric, vixRegime, refreshInterval, expirations.length]);
+  }, [activeTab, expiration, metric, vixRegime, refreshInterval, expirations?.length || 0]);
 
   // Reset data when switching tabs to prevent stale data
   useEffect(() => {

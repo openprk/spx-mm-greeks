@@ -135,7 +135,7 @@ def aggregate_by_strike(
     mode: str = "ALL"
 ) -> Dict[float, Dict]:
 
-    print(f"🔍 aggregate_by_strike called with {len(contracts)} contracts")
+    print(f"aggregate_by_strike called with {len(contracts)} contracts")
     strike_data = defaultdict(lambda: {
         "gex": 0.0, "dex": 0.0, "vex": 0.0, "cex": 0.0,
         "call_oi": 0, "put_oi": 0,
@@ -241,18 +241,3 @@ def aggregate_all_expirations(
         total["cex"] += strike_data["cex"]
 
     return total
-
-def calculate_neutral_threshold(values: List[float], epsilon: float = 0.05) -> float:
-
-    if not values:
-        return epsilon
-
-    abs_values = [abs(v) for v in values]
-    median_abs = np.median(abs_values)
-    return max(epsilon, 0.05 * median_abs)
-
-def classify_regime(value: float, neutral_threshold: float) -> str:
-
-    if abs(value) < neutral_threshold:
-        return "o"
-    return "+" if value > 0 else "-"

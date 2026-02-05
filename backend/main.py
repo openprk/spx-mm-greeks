@@ -35,18 +35,63 @@ app.add_middleware(
     allow_headers=["*"],
 )
 
-# Initialize clients and caches
-tradier_client = TradierClient()
+# Lazy initialization functions to prevent global state pollution during reloads
+_tradier_client = None
+_exposures_lock = None
+_matrix_lock = None
+_spot_cache = None
+_expirations_cache = None
+_chain_cache = None
+_calendar_cache = None
 
-# Single-flight locks to prevent concurrent recomputations
-exposures_lock = asyncio.Lock()
-matrix_lock = asyncio.Lock()
+def get_tradier_client():
+    """Get TradierClient instance with lazy initialization"""
+    global _tradier_client
+    if _tradier_client is None:
+        _tradier_client = TradierClient()
+    return _tradier_client
 
-# TTL caches for API responses
-spot_cache = TTLCache(maxsize=1, ttl=settings.alert_cache_ttl_seconds)  # 10s for dynamic alerts
-expirations_cache = TTLCache(maxsize=1, ttl=settings.cache_ttl_seconds)  # 60s for expirations
-chain_cache = TTLCache(maxsize=10, ttl=300)  # 5 minutes for expensive chain processing
-calendar_cache = TTLCache(maxsize=12, ttl=86400)  # 24 hours for calendar data (monthly)
+async def get_exposures_lock():
+    """Get exposures asyncio lock with lazy initialization"""
+    global _exposures_lock
+    if _exposures_lock is None:
+        _exposures_lock = asyncio.Lock()
+    return _exposures_lock
+
+async def get_matrix_lock():
+    """Get matrix asyncio lock with lazy initialization"""
+    global _matrix_lock
+    if _matrix_lock is None:
+        _matrix_lock = asyncio.Lock()
+    return _matrix_lock
+
+def get_spot_cache():
+    """Get spot cache with lazy initialization"""
+    global _spot_cache
+    if _spot_cache is None:
+        _spot_cache = TTLCache(maxsize=1, ttl=settings.alert_cache_ttl_seconds)
+    return _spot_cache
+
+def get_expirations_cache():
+    """Get expirations cache with lazy initialization"""
+    global _expirations_cache
+    if _expirations_cache is None:
+        _expirations_cache = TTLCache(maxsize=1, ttl=settings.cache_ttl_seconds)
+    return _expirations_cache
+
+def get_chain_cache():
+    """Get chain cache with lazy initialization"""
+    global _chain_cache
+    if _chain_cache is None:
+        _chain_cache = TTLCache(maxsize=10, ttl=300)
+    return _chain_cache
+
+def get_calendar_cache():
+    """Get calendar cache with lazy initialization"""
+    global _calendar_cache
+    if _calendar_cache is None:
+        _calendar_cache = TTLCache(maxsize=12, ttl=86400)
+    return _calendar_cache
 
 async def validate_expiration_has_data(expiration: str, spot_price: float, mode: str, instrument: str = "SPX") -> bool:
     """Check if an expiration date actually has options data available"""
@@ -62,7 +107,7 @@ async def find_working_expiration(target_expiration: str, spot_price: float, mod
     if await validate_expiration_has_data(target_expiration, spot_price, mode, instrument):
         return target_expiration
 
-    print(f"⚠️ Expiration {target_expiration} has no data, finding alternative...")
+    print(f"Expiration {target_expiration} has no data, finding alternative...")
 
     # Simple fallback: try next few Fridays (options expire on Fridays)
     # This avoids the potentially broken calendar API
@@ -83,10 +128,10 @@ async def find_working_expiration(target_expiration: str, spot_price: float, mod
         friday_str = friday_date.isoformat()
         try:
             if await validate_expiration_has_data(friday_str, spot_price, mode, instrument):
-                print(f"✅ Found working expiration: {friday_str}")
+                print(f"Found working expiration: {friday_str}")
                 return friday_str
         except Exception as e:
-            print(f"⚠️ Failed to check {friday_str}: {e}")
+            print(f"Failed to check {friday_str}: {e}")
             continue
 
     # If all Fridays fail, try future dates that should have options data
@@ -104,10 +149,10 @@ async def find_working_expiration(target_expiration: str, spot_price: float, mod
     for known_date in known_working_dates:
         try:
             if await validate_expiration_has_data(known_date, spot_price, mode, instrument):
-                print(f"✅ Found working expiration from known dates: {known_date}")
+                print(f"Found working expiration from known dates: {known_date}")
                 return known_date
         except Exception as e:
-            print(f"⚠️ Failed to check known date {known_date}: {e}")
+            print(f"Failed to check known date {known_date}: {e}")
             continue
 
     # If all known dates fail, try to get any available expirations
@@ -121,13 +166,13 @@ async def find_working_expiration(target_expiration: str, spot_price: float, mod
                 exp_str = exp if isinstance(exp, str) else str(exp)
                 try:
                     if await validate_expiration_has_data(exp_str, spot_price, mode, instrument):
-                        print(f"✅ Found working expiration from API list: {exp_str}")
+                        print(f"Found working expiration from API list: {exp_str}")
                         return exp_str
                 except Exception as e:
-                    print(f"⚠️ Failed to check API date {exp_str}: {e}")
+                    print(f"Failed to check API date {exp_str}: {e}")
                     continue
     except Exception as e:
-        print(f"⚠️ Failed to get expirations API: {e}")
+        print(f"Failed to get expirations API: {e}")
 
     # Ultimate fallback - use a date that should work based on pattern
     # Since we know 2026-02-05 worked, try similar dates
@@ -137,14 +182,14 @@ async def find_working_expiration(target_expiration: str, spot_price: float, mod
         test_str = test_date.isoformat()
         try:
             if await validate_expiration_has_data(test_str, spot_price, mode, instrument):
-                print(f"✅ Found working expiration from pattern: {test_str}")
+                print(f"Found working expiration from pattern: {test_str}")
                 return test_str
         except Exception as e:
-            print(f"⚠️ Failed to check pattern date {test_str}: {e}")
+            print(f"Failed to check pattern date {test_str}: {e}")
             continue
 
     # If everything fails, return the original known working date
-    print(f"⚠️ All fallbacks failed, using known working date: 2026-02-05")
+    print(f"All fallbacks failed, using known working date: 2026-02-05")
     return "2026-02-05"
 
 async def get_nearest_expiration_fallback() -> str:
@@ -159,7 +204,7 @@ async def get_nearest_expiration_fallback() -> str:
     ]
 
     for known_date in known_working_dates:
-        print(f"📅 Trying known fallback date: {known_date}")
+        print(f"Trying known fallback date: {known_date}")
         # Simple validation - just return it since we know these work
         return known_date
 
@@ -170,7 +215,7 @@ async def get_nearest_expiration_fallback() -> str:
         days_until_friday = 7  # Next Friday
     fallback_date = today + timedelta(days=days_until_friday)
     fallback_str = fallback_date.isoformat()
-    print(f"📅 Using Friday fallback: {fallback_str}")
+    print(f"Using Friday fallback: {fallback_str}")
     return fallback_str
 
 
@@ -193,15 +238,15 @@ async def get_next_trading_day(target_date: str = None) -> str:
 
     # Check cache first
     cache_key = f"{current_year}-{current_month:02d}"
-    if cache_key in calendar_cache:
-        calendar_data = calendar_cache[cache_key]
+    if cache_key in get_calendar_cache():
+        calendar_data = get_calendar_cache()[cache_key]
     else:
         # Fetch calendar data
         try:
-            calendar_data = await tradier_client.get_market_calendar(current_month, current_year)
-            calendar_cache[cache_key] = calendar_data
+            calendar_data = await get_tradier_client().get_market_calendar(current_month, current_year)
+            get_calendar_cache()[cache_key] = calendar_data
         except Exception as e:
-            print(f"⚠️ Failed to fetch calendar data for {current_year}-{current_month:02d}: {e}")
+            print(f"Failed to fetch calendar data for {current_year}-{current_month:02d}: {e}")
             # Fallback: assume target_date is a trading day
             return target_date
 
@@ -213,7 +258,7 @@ async def get_next_trading_day(target_date: str = None) -> str:
         day_status = day_info.get("status", "")
 
         if day_date >= target_date and day_status == "open":
-            print(f"📅 Found next trading day: {day_date} (status: {day_status})")
+            print(f"Found next trading day: {day_date} (status: {day_status})")
             return day_date
 
     # If no trading days found in current month, try next month
@@ -225,24 +270,24 @@ async def get_next_trading_day(target_date: str = None) -> str:
 
     try:
         cache_key_next = f"{next_year}-{next_month:02d}"
-        if cache_key_next in calendar_cache:
-            calendar_data_next = calendar_cache[cache_key_next]
+        if cache_key_next in get_calendar_cache():
+            calendar_data_next = get_calendar_cache()[cache_key_next]
         else:
-            calendar_data_next = await tradier_client.get_market_calendar(next_month, next_year)
-            calendar_cache[cache_key_next] = calendar_data_next
+            calendar_data_next = await get_tradier_client().get_market_calendar(next_month, next_year)
+            get_calendar_cache()[cache_key_next] = calendar_data_next
 
         days_next = calendar_data_next.get("calendar", {}).get("days", [])
         for day_info in days_next:
             day_date = day_info.get("date", "")
             day_status = day_info.get("status", "")
             if day_status == "open":
-                print(f"📅 Found next trading day in next month: {day_date} (status: {day_status})")
+                print(f"Found next trading day in next month: {day_date} (status: {day_status})")
                 return day_date
     except Exception as e:
-        print(f"⚠️ Failed to fetch next month calendar data: {e}")
+        print(f"Failed to fetch next month calendar data: {e}")
 
     # Ultimate fallback: return target_date
-    print(f"⚠️ No trading days found, using fallback: {target_date}")
+    print(f"No trading days found, using fallback: {target_date}")
     return target_date
 
 @app.get("/api/health", response_model=HealthResponse)
@@ -258,7 +303,7 @@ async def health_check():
 async def get_market_clock():
     """Get current market clock status"""
     try:
-        clock_data = await tradier_client.get_market_clock()
+        clock_data = await get_tradier_client().get_market_clock()
         return clock_data
     except Exception as e:
         raise HTTPException(status_code=500, detail=f"Failed to get market clock: {str(e)}")
@@ -271,12 +316,12 @@ async def get_calendar(
     """Get market calendar for specific month/year"""
     cache_key = f"{year}-{month:02d}"
 
-    if cache_key in calendar_cache:
-        return calendar_cache[cache_key]
+    if cache_key in get_calendar_cache():
+        return get_calendar_cache()[cache_key]
 
     try:
-        calendar_data = await tradier_client.get_market_calendar(month, year)
-        calendar_cache[cache_key] = calendar_data
+        calendar_data = await get_tradier_client().get_market_calendar(month, year)
+        get_calendar_cache()[cache_key] = calendar_data
         return calendar_data
     except Exception as e:
         raise HTTPException(status_code=500, detail=f"Failed to get market calendar: {str(e)}")
@@ -295,13 +340,13 @@ async def get_spot():
     """Get current SPX spot quote"""
     cache_key = "spot"
 
-    if cache_key in spot_cache:
-        return spot_cache[cache_key]
+    if cache_key in get_spot_cache():
+        return get_spot_cache()[cache_key]
 
     try:
-        spot_data = await tradier_client.get_spx_quote()
+        spot_data = await get_tradier_client().get_spx_quote()
         response = SpotResponse(**spot_data)
-        spot_cache[cache_key] = response
+        get_spot_cache()[cache_key] = response
         return response
     except Exception as e:
         raise HTTPException(status_code=500, detail=f"Failed to fetch SPX quote: {str(e)}")
@@ -311,12 +356,12 @@ async def get_expirations():
     """Get available SPX options expiration dates"""
     cache_key = "expirations"
 
-    if cache_key in expirations_cache:
-        return {"expirations": expirations_cache[cache_key]}
+    if cache_key in get_expirations_cache():
+        return {"expirations": get_expirations_cache()[cache_key]}
 
     try:
-        expirations = await tradier_client.get_spx_expirations()
-        expirations_cache[cache_key] = expirations
+        expirations = await get_tradier_client().get_spx_expirations()
+        get_expirations_cache()[cache_key] = expirations
         return {"expirations": expirations}
     except Exception as e:
         raise HTTPException(status_code=500, detail=f"Failed to fetch expirations: {str(e)}")
@@ -326,13 +371,13 @@ async def get_spxw_quote():
     """Get current SPXW spot quote (diagnostic)"""
     cache_key = "spxw_quote"
 
-    if cache_key in spot_cache:
-        return spot_cache[cache_key]
+    if cache_key in get_spot_cache():
+        return get_spot_cache()[cache_key]
 
     try:
-        spxw_data = await tradier_client.get_spxw_quote()
+        spxw_data = await get_tradier_client().get_spxw_quote()
         response = SpotResponse(**spxw_data)
-        spot_cache[cache_key] = response
+        get_spot_cache()[cache_key] = response
         return response
     except Exception as e:
         raise HTTPException(status_code=500, detail=f"Failed to fetch SPXW quote: {str(e)}")
@@ -382,8 +427,8 @@ async def get_exposures(
         except ImportError:
             # Fallback if pytz not available - use date.today() but warn
             today_date = date.today().isoformat()
-            print(f"⚠️ pytz not available, using server local date: {today_date}")
-        print(f"🔥 0DTE mode: Attempting to use TODAY'S expiration only: {today_date} (US/Eastern timezone)")
+            print(f"pytz not available, using server local date: {today_date}")
+        print(f"0DTE mode: Attempting to use TODAY'S expiration only: {today_date} (US/Eastern timezone)")
 
         # For 0DTE validation, use a reasonable SPX spot estimate to avoid filtering issues
         spot_estimate = 6900  # Conservative estimate for validation
@@ -393,24 +438,24 @@ async def get_exposures(
             today_chain = await get_chain_data(today_date, spot_estimate, "0DTE", instrument)
             if len(today_chain) > 0:
                 expiration = today_date
-                print(f"✅ 0DTE mode: Using today's expiration: {expiration}")
+                print(f"0DTE mode: Using today's expiration: {expiration}")
             else:
                 raise ValueError("No options available for today")
         except Exception as e:
-            print(f"❌ 0DTE mode: No valid options for today ({e})")
+            print(f"0DTE mode: No valid options for today ({e})")
             # For 0DTE, if today has no options, return empty data instead of falling back
             expiration = today_date  # Keep today as expiration but will result in empty data
-            print(f"⚠️ 0DTE mode: Today has no options - returning empty dataset")
+            print(f"0DTE mode: Today has no options - returning empty dataset")
 
     try:
         # Use single-flight pattern to prevent concurrent recomputations
-        async with exposures_lock:
+        async with await get_exposures_lock():
             # Get spot price with fallback handling (Roberto requirement: SPX is single source of truth)
             try:
                 spot_response = await get_spot()
                 spot_price = spot_response.last
             except Exception as e:
-                print(f"❌ SPX spot completely unavailable: {e}")
+                print(f"SPX spot completely unavailable: {e}")
                 # Only fall back when SPX is completely unavailable, not just stale
                 raise HTTPException(
                     status_code=503,
@@ -419,38 +464,38 @@ async def get_exposures(
 
             # DATA INTEGRITY CHECK: Compare SPX vs SPXW quotes for consistency
             try:
-                spxw_response = await tradier_client.get_spxw_quote()
+                spxw_response = await get_tradier_client().get_spxw_quote()
                 spxw_price = spxw_response.get("last", spot_price)
                 price_delta = abs(spot_price - spxw_price)
 
-                print(f"🔍 Spot price integrity: SPX={spot_price:.2f}, SPXW={spxw_price:.2f}, delta={price_delta:.2f}")
-                print(f"🏷️ SPX is SINGLE SOURCE OF TRUTH for ALL exposure calculations (Roberto requirement)")
+                print(f"Spot price integrity: SPX={spot_price:.2f}, SPXW={spxw_price:.2f}, delta={price_delta:.2f}")
+                print(f"SPX is SINGLE SOURCE OF TRUTH for ALL exposure calculations (Roberto requirement)")
 
                 # Flag significant discrepancies and consider fallback for data quality
                 if price_delta > 2.0:
-                    print(f"⚠️ LARGE SPX-SPXW DELTA ({price_delta:.2f} points) - potential SPX data quality issue")
+                    print(f"LARGE SPX-SPXW DELTA ({price_delta:.2f} points) - potential SPX data quality issue")
                     # If delta is very large, SPX data might be problematic - consider mid price fallback
                     if spot_response.bid > 0 and spot_response.ask > 0:
                         mid_price = (spot_response.bid + spot_response.ask) / 2
-                        print(f"🔄 Large delta detected, falling back to mid price: {mid_price:.2f} (was {spot_price:.2f})")
+                        print(f"Large delta detected, falling back to mid price: {mid_price:.2f} (was {spot_price:.2f})")
                         spot_price = mid_price
 
                 # SPX is SINGLE SOURCE OF TRUTH - use more reliable SPX source when data seems stale
                 if spot_response.trade_date == 0:
                     if spot_response.bid > 0 and spot_response.ask > 0:
                         mid_price = (spot_response.bid + spot_response.ask) / 2
-                        print(f"🔄 SPX TRADE_DATE = 0, falling back to mid price: {mid_price:.2f} (was {spot_price:.2f})")
+                        print(f"SPX TRADE_DATE = 0, falling back to mid price: {mid_price:.2f} (was {spot_price:.2f})")
                         spot_price = mid_price
                     else:
-                        print(f"⚠️ SPX TRADE_DATE = 0 but no bid/ask available, continuing with last price")
-                    print(f"🔍 SPX-SPXW delta: {price_delta:.2f} points (SPXW never used for calculations)")
+                        print(f"SPX TRADE_DATE = 0 but no bid/ask available, continuing with last price")
+                    print(f"SPX-SPXW delta: {price_delta:.2f} points (SPXW never used for calculations)")
 
             except Exception as e:
-                print(f"⚠️ SPX-SPXW integrity check failed: {e} - continuing with SPX data (SPX is single source of truth)")
+                print(f"SPX-SPXW integrity check failed: {e} - continuing with SPX data (SPX is single source of truth)")
 
             # GUARDRAIL: SPX must ALWAYS be the single source of truth for spot pricing (Roberto requirement)
             assert spot_response.symbol == "SPX", f"MUST use SPX spot for ALL calculations (single source of truth), got {spot_response.symbol}"
-            print(f"✅ SPX guardrail passed: Using {spot_response.symbol} spot ({spot_price}) for ALL calculations (mode: {mode})")
+            print(f"SPX guardrail passed: Using {spot_response.symbol} spot ({spot_price}) for ALL calculations (mode: {mode})")
 
             # Get data based on expiration
             if expiration == "ALL":
@@ -466,11 +511,11 @@ async def get_exposures(
                         eastern = pytz.timezone('US/Eastern')
                         today_eastern = datetime.now(eastern).date().isoformat()
                         all_expirations = [exp for exp in all_expirations if exp != today_eastern]
-                        print(f"🔄 Structure mode: Excluded today's expiration ({today_eastern}) from ALL aggregation (US/Eastern timezone)")
+                        print(f"Structure mode: Excluded today's expiration ({today_eastern}) from ALL aggregation (US/Eastern timezone)")
                     except ImportError:
                         today = date.today().isoformat()
                         all_expirations = [exp for exp in all_expirations if exp != today]
-                        print(f"🔄 Structure mode: Excluded today's expiration ({today}) from ALL aggregation (server local time)")
+                        print(f"Structure mode: Excluded today's expiration ({today}) from ALL aggregation (server local time)")
 
                 # Aggregate data across all expirations
                 all_strike_data = {}
@@ -503,12 +548,12 @@ async def get_exposures(
             else:
                 # Single expiration - validate it has data first
                 if not await validate_expiration_has_data(expiration, spot_price, mode, instrument):
-                    print(f"⚠️ Selected expiration {expiration} has no data, finding alternative...")
+                    print(f"Selected expiration {expiration} has no data, finding alternative...")
                     expiration = await find_working_expiration(expiration, spot_price, mode, instrument)
-                    print(f"🔄 Using alternative expiration: {expiration}")
+                    print(f"Using alternative expiration: {expiration}")
 
                 chain_data = await get_chain_data(expiration, spot_price, mode, instrument)
-                print(f"🔍 Chain data for {expiration}: {len(chain_data)} contracts")
+                print(f"Chain data for {expiration}: {len(chain_data)} contracts")
 
                 if len(chain_data) == 0:
                     raise HTTPException(
@@ -523,7 +568,7 @@ async def get_exposures(
                     settings.dividend_yield,
                     mode
                 )
-                print(f"🔍 Strike aggregations for {expiration}: {len(strike_aggregations)} strikes")
+                print(f"Strike aggregations for {expiration}: {len(strike_aggregations)} strikes")
 
         # Convert to StrikeData objects
         strikes_data = []
@@ -692,7 +737,7 @@ async def get_exposures_matrix(
 
     try:
         # Use single-flight pattern to prevent concurrent recomputations
-        async with matrix_lock:
+        async with await get_matrix_lock():
             # Get spot price
             spot_response = await get_spot()
             spot_price = spot_response.last
@@ -709,15 +754,15 @@ async def get_exposures_matrix(
                 eastern = pytz.timezone('US/Eastern')
                 today_eastern = datetime.now(eastern).date().isoformat()
                 all_expirations = [exp for exp in all_expirations if exp != today_eastern]
-                print(f"🔄 Matrix mode: Excluded today's expiration ({today_eastern}) from analysis (US/Eastern timezone)")
+                print(f"Matrix mode: Excluded today's expiration ({today_eastern}) from analysis (US/Eastern timezone)")
             except ImportError:
                 today = date.today().isoformat()
                 all_expirations = [exp for exp in all_expirations if exp != today]
-                print(f"🔄 Matrix mode: Excluded today's expiration ({today}) from analysis (server local time)")
+                print(f"Matrix mode: Excluded today's expiration ({today}) from analysis (server local time)")
 
         all_expirations = all_expirations[:8]  # Limit to 8 expirations for performance
 
-        print(f"📊 Building enhanced matrix for {len(all_expirations)} expirations with metric {metric}")
+        print(f"Building enhanced matrix for {len(all_expirations)} expirations with metric {metric}")
 
         # Collect data for each expiration
         expiration_data = {}
@@ -753,15 +798,15 @@ async def get_exposures_matrix(
                         )
 
                 expiration_data[exp] = strike_exposures
-                print(f"✅ Loaded {len(strike_exposures)} strikes for {exp}")
+                print(f"Loaded {len(strike_exposures)} strikes for {exp}")
 
             except Exception as e:
-                print(f"⚠️ Failed to get data for {exp}: {e}")
+                print(f"Failed to get data for {exp}: {e}")
                 # Continue with other expirations
 
         # Create common strike set (sorted)
         common_strikes = sorted(list(all_strikes))[:25]  # Limit strikes for performance
-        print(f"🎯 Using {len(common_strikes)} common strikes across {len(expiration_data)} expirations")
+        print(f"Using {len(common_strikes)} common strikes across {len(expiration_data)} expirations")
 
         # Build matrix: rows = expirations, columns = strikes
         matrix_data = []
@@ -798,18 +843,18 @@ async def get_chain_data(expiration: str, spot_price: float = None, mode: str = 
     """Helper function to get cached chain data"""
     cache_key = f"chain_{expiration}"
 
-    if cache_key in chain_cache:
-        return chain_cache[cache_key]
+    if cache_key in get_chain_cache():
+        return get_chain_cache()[cache_key]
 
     try:
         # Use instrument parameter to determine data source
         try:
             if instrument == "SPXW":
-                chain_data = await tradier_client.get_spxw_chain(expiration)
-                print(f"🔥 Using SPXW data (instrument={instrument}, mode={mode}) on {expiration}")
+                chain_data = await get_tradier_client().get_spxw_chain(expiration)
+                print(f"Using SPXW data (instrument={instrument}, mode={mode}) on {expiration}")
             else:
-                chain_data = await tradier_client.get_spx_chain(expiration)
-                print(f"🔥 Using SPX data (instrument={instrument}, mode={mode}) on {expiration}")
+                chain_data = await get_tradier_client().get_spx_chain(expiration)
+                print(f"Using SPX data (instrument={instrument}, mode={mode}) on {expiration}")
         except Exception as e:
             raise HTTPException(
                 status_code=503,
@@ -842,7 +887,7 @@ async def get_chain_data(expiration: str, spot_price: float = None, mode: str = 
 
             invalid_count = original_count - len(valid_options)
             if invalid_count > 0:
-                print(f"⚠️ Filtered out {invalid_count} invalid/None option objects from {original_count} total")
+                print(f"Filtered out {invalid_count} invalid/None option objects from {original_count} total")
 
             options = valid_options
 
@@ -855,18 +900,18 @@ async def get_chain_data(expiration: str, spot_price: float = None, mode: str = 
                 # Standard filtering for SPX: ±30% of spot price
                 min_strike = spot_price * 0.7
                 max_strike = spot_price * 1.3
-                print(f"📊 SPX standard mode: Using broad strike filter (±30% of spot: {min_strike:.0f}-{max_strike:.0f})")
+                print(f"SPX standard mode: Using broad strike filter (±30% of spot: {min_strike:.0f}-{max_strike:.0f})")
 
             # Apply strike range filtering to valid options
             options = [
                 opt for opt in options
                 if min_strike <= float(opt.get("strike", 0)) <= max_strike
             ]
-            print(f"📊 Filtered {len(valid_options)} valid options to {len(options)} relevant strikes")
+            print(f"Filtered {len(valid_options)} valid options to {len(options)} relevant strikes")
 
             # Debug: show first available option
             if options:
-                print(f"🔍 Sample option: {options[0]}")
+                print(f"Sample option: {options[0]}")
 
         # Convert to OptionContract objects
         contracts = []
@@ -895,12 +940,12 @@ async def get_chain_data(expiration: str, spot_price: float = None, mode: str = 
                 )
                 contracts.append(contract)
             except Exception as e:
-                print(f"❌ Failed to create contract for {opt.get('symbol', 'unknown')}: {e}")
+                print(f"Failed to create contract for {opt.get('symbol', 'unknown')}: {e}")
                 continue
 
-        print(f"📦 Created {len(contracts)} OptionContract objects from {len(options)} options")
+        print(f"Created {len(contracts)} OptionContract objects from {len(options)} options")
 
-        chain_cache[cache_key] = contracts
+        get_chain_cache()[cache_key] = contracts
         return contracts
 
     except Exception as e:

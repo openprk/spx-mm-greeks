@@ -151,6 +151,11 @@ const TerrainTable: React.FC<TerrainTableProps> = ({
           </thead>
           <tbody>
             {terrainData.map((strike) => {
+              // Calculate exact spot strikes using floor/ceil by increment (like backend)
+              const strikeIncrement = 5; // SPX strike increment
+              const lowerSpotStrike = Math.floor(spot / strikeIncrement) * strikeIncrement;
+              const upperSpotStrike = lowerSpotStrike + strikeIncrement;
+              const isSpotStrike = strike.strike === lowerSpotStrike || strike.strike === upperSpotStrike;
               const isAtSpot = Math.abs(strike.strike - spot) < 5;
               const hasFlags = strike.pattern_flags.length > 0;
 
@@ -159,7 +164,7 @@ const TerrainTable: React.FC<TerrainTableProps> = ({
                   key={strike.strike}
                   className={`border-b border-gray-100 ${
                     isAtSpot ? 'bg-yellow-50' :
-                    hasFlags ? 'bg-red-50' : ''
+                    (hasFlags && isSpotStrike) ? 'bg-red-50' : ''  // ALERT banner only for spot strikes
                   }`}
                 >
                   {/* Strike */}
@@ -215,16 +220,21 @@ const TerrainTable: React.FC<TerrainTableProps> = ({
                       <div className="text-xs xl:text-sm truncate" title={strike.classification}>
                         {strike.classification.split(' — ')[0]}
                       </div>
-                      {strike.pattern_flags.length > 0 && (
+                      {strike.pattern_flags.length > 0 && isSpotStrike && (
                         <div className="mt-1 space-x-1">
                           {strike.pattern_flags.map(flag => (
                             <span
                               key={flag}
-                              className="inline-block px-1 py-0.5 text-xs xl:text-sm bg-red-100 text-red-800 rounded"
+                              className="inline-block px-1 py-0.5 text-xs xl:text-sm bg-red-100 text-red-800 rounded font-medium"
                             >
-                              {flag.replace('MAX_DOWNSIDE_', 'MAX ')}
+                              ALERT: {flag.replace('MAX_DOWNSIDE_', 'MAX ')}
                             </span>
                           ))}
+                        </div>
+                      )}
+                      {strike.pattern_flags.length > 0 && !isSpotStrike && (
+                        <div className="mt-1 text-xs xl:text-sm text-gray-600 italic">
+                          Pattern detected
                         </div>
                       )}
                     </div>
